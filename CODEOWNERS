@@ -1,0 +1,12 @@
+# Shadow Account Protocol — required review ownership
+# Initial repository owner approved by the user on 2026-08-17.
+
+/programs/** @Adaptive-Liquidity
+/composer/** @Adaptive-Liquidity
+/config/** @Adaptive-Liquidity
+/scripts/** @Adaptive-Liquidity
+/.github/** @Adaptive-Liquidity
+/docs/** @Adaptive-Liquidity
+/audit/** @Adaptive-Liquidity
+/Anchor.toml @Adaptive-Liquidity
+/Cargo.toml @Adaptive-Liquidity
