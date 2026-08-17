@@ -1,23 +1,43 @@
-# Shadow Account Protocol External Audit Package
+# Shadow Account Protocol
 
-This package is an evolving index for an eventual independent Solana/Anchor and off-chain execution-control audit. It does not claim audit readiness or a clean result. Each artifact must be regenerated from a reviewed Git commit and identified by immutable hash.
+A **non-production security baseline** for a Solana flash-loan paymaster architecture. The repository enforces deterministic admission rules and starts with execution disabled. It contains no deployment key, remote signer credential, relay endpoint, funded vault, or live transaction path.
 
-| Artifact | Repository location | Current state |
-|---|---|---|
-| System invariants and threat model | `docs/THREAT_MODEL.md` | Drafted for local baseline. |
-| Build status and blockers | `docs/BUILD_STATUS.md` | Local baseline evidence; integration blockers active. |
-| Source locks | `config/sources.lock.json` | Jupiter/Jito remain blocked. |
-| Jupiter evidence draft | `evidence/jupiter-flashloan/` | Program/IDL observations captured; immutable artifact hash missing. |
-| Jito evidence draft | `evidence/jito/` | API/status/DontFront observations captured; endpoint lock missing. |
-| Remote signer qualification | `docs/REMOTE_SIGNER_QUALIFICATION.md` | Provider-neutral protocol; no provider selected. |
-| Anchor program | `programs/shadow_paymaster/` | Local-only unit-tested baseline. |
-| Composer controls | `composer/src/` and `composer/test/` | Deterministic gate, local harness, fake relay, and adversarial tests. |
-| Release governance | `.github/` and `docs/GITHUB_GOVERNANCE.md` | Local templates/CI added; no local Git remote attached. |
+## Repository layout
 
-## Auditor questions
+| Path | Purpose |
+|---|---|
+| `programs/shadow_paymaster` | Anchor settlement state machine with fixed vault/mint/destinations, nonce-bound record, pause state, and checked 15/85 profit split. |
+| `composer` | Deterministic TypeScript manifest, topology, source-lock, simulation, fee, profit, and exact-message-signature checks. |
+| `config/sources.lock.json` | Evidence gate. Its current blocked entries make executable admission impossible. |
+| `docs/BUILD_STATUS.md` | Implemented controls, test evidence, and hard execution blockers. |
+| `docs/MODEL_ROUTING.md` | Qualified-model policy and current Hugging Face inference-capability block. |
+| `docs/EXECUTION_GATES_STATUS.md` | Gate-by-gate implementation progress, validation status, and deliberate blockers. |
+| `docs/GITHUB_GOVERNANCE.md` | Required branch protection and repository-security settings after a remote is attached. |
+| `docs/REMOTE_SIGNER_QUALIFICATION.md` | Provider-neutral exact-message Ed25519 qualification protocol. |
+| `docs/THREAT_MODEL.md` | Threat model, trust boundaries, and assurance requirements. |
+| `evidence/` | Draft Jupiter and Jito evidence records that do not authorize execution. |
+| `audit/` | External audit package index and model-assisted review protocol. |
 
-The eventual auditor should validate account constraints; PDA derivations; state-machine reachability; token-account/mint/program substitutions; arithmetic and rounding; source-lock update process; versioned transaction/ALT decoding; signer receipt exact-byte verification; remote-signer policy boundaries; relay status and duplicate handling; MEV assumptions; test quality; and deployment/canary governance. The audit scope must include both the Anchor program and the off-chain composer/signer/relay controls.
+## Local-only validation
 
-## Evidence admission rule
+```bash
+source "$HOME/.cargo/env"
+cd /home/ubuntu/shadow-account-protocol
+cargo fmt --check
+cargo test -p shadow_paymaster
+cargo check -p shadow_paymaster
 
-No document may describe a blocked integration as implemented or production-ready. External source claims require primary URL, immutable version/commit, retrieval date, artifact hash, independently decoded interface evidence, test result, and reviewer record. Model output may be included only as a non-authoritative review artifact with its provider/model ID and deterministic validation evidence.
+cd composer
+pnpm build
+pnpm test
+```
+
+## Security boundaries
+
+The on-chain program uses only fixed configuration-owned mint, vault, paymaster destination, and treasury destination accounts. It computes distribution from recorded balance deltas and obligations, not caller-supplied profit or payout values. The off-chain gate rejects any noncanonical transaction sequence, route or flash-loan instruction outside TX-1, unapproved program/account/ALT, stale simulation, unsafe fee/tip exposure, reused nonce, destination substitution, wrong signer, or invalid exact-message receipt. The local-only harness also rejects a funded agent and insufficient paymaster fee coverage; the fake relay rejects duplicates, expiry retry, terminal-state mutation, and unknown-status escalation.
+
+> **Do not deploy, fund, sign, connect a remote signer, send a transaction, or submit a bundle from this repository.** The source lock intentionally blocks Jupiter Flashloan and Jito relay activation pending immutable interface evidence and local fixtures.
+
+## Current build constraints
+
+The local compiler stack is installed and the program/tests build. The external Jupiter Flashloan IDL and Jito submission endpoint remain source-lock blocked. The current Hugging Face integration does not expose coding-model inference, so no model is qualified or used to generate code through that connector.

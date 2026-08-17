@@ -1,0 +1,23 @@
+[package]
+name = "shadow_paymaster"
+version = "0.1.0"
+description = "Deterministic, non-production settlement state machine for the Shadow Account Protocol"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "shadow_paymaster"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+anchor-debug = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "=0.32.1"
+anchor-spl = { version = "=0.32.1", features = ["token", "associated_token"] }

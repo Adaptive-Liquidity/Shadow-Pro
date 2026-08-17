@@ -1,0 +1,66 @@
+{
+  "status": "evidence-draft-not-authorized",
+  "retrieved_at_utc": "2026-08-16T00:00:00Z",
+  "source": {
+    "program_address_page": "https://dev.jup.ag/docs/lend/program-addresses",
+    "idl_moving_ref": "https://raw.githubusercontent.com/jup-ag/jupiter-lend/main/target/idl/flashloan.json",
+    "main_commit_observed": "33a22cf7a5bfdd32ab1712dda4adfbeb9b348ad9",
+    "immutable_raw_idl": null,
+    "idl_sha256": null
+  },
+  "program_id": "jupgfSgfuAXv4B6R2Uxu85Z1qdzgju79s6MfZekN6XS",
+  "idl_metadata": {
+    "name": "flashloan",
+    "version": "0.1.4",
+    "spec": "0.1.0"
+  },
+  "borrow": {
+    "name": "flashloan_borrow",
+    "discriminator": [103, 19, 78, 24, 240, 9, 135, 63],
+    "args": [{"name": "amount", "type": "u64"}],
+    "accounts_in_order": [
+      "signer",
+      "flashloan_admin",
+      "signer_borrow_token_account",
+      "mint",
+      "flashloan_token_reserves_liquidity",
+      "flashloan_borrow_position_on_liquidity",
+      "rate_model",
+      "vault",
+      "liquidity",
+      "liquidity_program",
+      "token_program",
+      "associated_token_program_optional",
+      "system_program",
+      "instruction_sysvar"
+    ]
+  },
+  "payback": {
+    "name": "flashloan_payback",
+    "discriminator": [213, 47, 153, 137, 84, 243, 94, 232],
+    "args": [{"name": "amount", "type": "u64"}],
+    "accounts_in_order": [
+      "signer",
+      "flashloan_admin",
+      "signer_borrow_token_account",
+      "mint",
+      "flashloan_token_reserves_liquidity",
+      "flashloan_borrow_position_on_liquidity",
+      "rate_model",
+      "vault",
+      "liquidity",
+      "liquidity_program",
+      "token_program",
+      "associated_token_program_optional",
+      "system_program",
+      "instruction_sysvar"
+    ]
+  },
+  "pinning_requirements": [
+    "Retrieve immutable raw IDL by full commit URL.",
+    "Compute exact raw-byte SHA-256 locally.",
+    "Compare decoder output against this draft and official IDL.",
+    "Retain local fixtures for missing, duplicate, reordered, and altered payback cases.",
+    "Keep source lock blocked until independent review passes."
+  ]
+}
