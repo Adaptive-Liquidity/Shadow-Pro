@@ -1,0 +1,335 @@
+{
+  "schema_version": "1.0",
+  "artifact_sha256": "7fac42ff8320d70162f81c610cb985418a11ed8d40f09a0b2cc3809fc25ef4be",
+  "program_id": "jupgfSgfuAXv4B6R2Uxu85Z1qdzgju79s6MfZekN6XS",
+  "idl_name": "flashloan",
+  "idl_version": "0.1.4",
+  "instructions": [
+    {
+      "name": "flashloan_borrow",
+      "discriminator": [
+        103,
+        19,
+        78,
+        24,
+        240,
+        9,
+        135,
+        63
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ],
+      "accounts": [
+        {
+          "index": 0,
+          "name": "signer",
+          "signer": true,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 1,
+          "name": "flashloan_admin",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 2,
+          "name": "signer_borrow_token_account",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 3,
+          "name": "mint",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 4,
+          "name": "flashloan_token_reserves_liquidity",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 5,
+          "name": "flashloan_borrow_position_on_liquidity",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 6,
+          "name": "rate_model",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 7,
+          "name": "vault",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 8,
+          "name": "liquidity",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 9,
+          "name": "liquidity_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [
+            "flashloan_admin"
+          ],
+          "pda": null
+        },
+        {
+          "index": 10,
+          "name": "token_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 11,
+          "name": "associated_token_program",
+          "signer": false,
+          "writable": false,
+          "optional": true,
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 12,
+          "name": "system_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": "11111111111111111111111111111111",
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 13,
+          "name": "instruction_sysvar",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": "Sysvar1nstructions1111111111111111111111111",
+          "relations": [],
+          "pda": null
+        }
+      ]
+    },
+    {
+      "name": "flashloan_payback",
+      "discriminator": [
+        213,
+        47,
+        153,
+        137,
+        84,
+        243,
+        94,
+        232
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ],
+      "accounts": [
+        {
+          "index": 0,
+          "name": "signer",
+          "signer": true,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 1,
+          "name": "flashloan_admin",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 2,
+          "name": "signer_borrow_token_account",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 3,
+          "name": "mint",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 4,
+          "name": "flashloan_token_reserves_liquidity",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 5,
+          "name": "flashloan_borrow_position_on_liquidity",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 6,
+          "name": "rate_model",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 7,
+          "name": "vault",
+          "signer": false,
+          "writable": true,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 8,
+          "name": "liquidity",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 9,
+          "name": "liquidity_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [
+            "flashloan_admin"
+          ],
+          "pda": null
+        },
+        {
+          "index": 10,
+          "name": "token_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": null,
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 11,
+          "name": "associated_token_program",
+          "signer": false,
+          "writable": false,
+          "optional": true,
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 12,
+          "name": "system_program",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": "11111111111111111111111111111111",
+          "relations": [],
+          "pda": null
+        },
+        {
+          "index": 13,
+          "name": "instruction_sysvar",
+          "signer": false,
+          "writable": false,
+          "optional": false,
+          "address": "Sysvar1nstructions1111111111111111111111111",
+          "relations": [],
+          "pda": null
+        }
+      ]
+    }
+  ]
+}
