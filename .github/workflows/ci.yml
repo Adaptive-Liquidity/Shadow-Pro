@@ -23,17 +23,17 @@ jobs:
         with:
           components: rustfmt
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: composer/pnpm-lock.yaml
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Reject credential material
         run: bash scripts/check_secrets.sh
