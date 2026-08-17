@@ -20,6 +20,12 @@ const REQUIRED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedI
   treasury_settle_and_tip: ['treasury_settle', 'jito_tip'],
 };
 
+const ALLOWED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedInstruction['classifier'][]> = {
+  execute_flash_route: [...REQUIRED_CLASSIFIERS.execute_flash_route, 'route'],
+  distribute_profit: REQUIRED_CLASSIFIERS.distribute_profit,
+  treasury_settle_and_tip: REQUIRED_CLASSIFIERS.treasury_settle_and_tip,
+};
+
 function reject(code: string, detail: string): GateDecision {
   return { allowed: false, code, detail };
 }
@@ -43,7 +49,7 @@ function hasRequiredClassifiers(transaction: DecodedTransaction): boolean {
   const classes = transaction.instructions.map((instruction) => instruction.classifier);
   const required = REQUIRED_CLASSIFIERS[transaction.role];
   if (!required.every((classifier) => classes.includes(classifier))) return false;
-  if (!classes.every((classifier) => required.includes(classifier))) return false;
+  if (!classes.every((classifier) => ALLOWED_CLASSIFIERS[transaction.role].includes(classifier))) return false;
   if (transaction.role === 'execute_flash_route') return hasExpectedSequence(transaction.instructions);
   if (transaction.role === 'treasury_settle_and_tip') return classes.at(-1) === 'jito_tip';
   return true;
@@ -106,7 +112,7 @@ export function validateManifest(manifest: TransactionManifest, policy: GatePoli
     const isolationError = transactionIsolationError(transaction);
     if (isolationError) return isolationError;
     if (!hasRequiredClassifiers(transaction)) {
-      const hasUnexpectedClass = transaction.instructions.some((instruction) => !REQUIRED_CLASSIFIERS[transaction.role].includes(instruction.classifier));
+      const hasUnexpectedClass = transaction.instructions.some((instruction) => !ALLOWED_CLASSIFIERS[transaction.role].includes(instruction.classifier));
       return reject(
         hasUnexpectedClass ? 'UNEXPECTED_INSTRUCTION_CLASSIFIER' : 'INSTRUCTION_TOPOLOGY_INVALID',
         `Transaction ${transaction.index} violates required classifier order or scope.`,
