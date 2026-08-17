@@ -18,11 +18,15 @@
 
 | Scope | Result |
 |---|---|
+| Repository secret-pattern check | Passed; no configured credential material or private-key-like file found. |
+| Source-lock check | Passed; external Jupiter and Jito dependencies remain fail-closed. |
 | Composer strict TypeScript build | Passed. |
-| Composer adversarial tests | 15 passed: canonicalization, exact split, topology, destination, tip account, stale simulation, insufficient profit, nonce replay, exact-message signature, signer substitution, source lock. |
+| Composer adversarial tests | **26 passed** across canonicalization, topology, destination, tip, freshness, profit, nonce replay, exact-message receipt verification, source lock, local zero-agent-capital/fee coverage, route/flash isolation, and fake-relay duplicate/expiry/status cases. |
+| Composer production dependency audit | Passed; no known vulnerabilities reported. |
 | Anchor program formatting | Passed. |
 | Anchor program unit tests | 5 passed: program ID, exact 15/85 split, repayment shortfall, strict minimum, arithmetic overflow. |
 | Anchor program compiler check | Passed with four known Anchor macro `unexpected_cfg` warnings under Rust 1.97 / Anchor 0.32.1; no Rust compile errors. |
+| Pull-request CI | Passed on PR #1 after correcting the pnpm setup order. |
 | Project skills validation | 3 of 3 valid. |
 
 ## Execution blockers
@@ -42,4 +46,4 @@ The available Hugging Face integration was inspected. It exposes Hub discovery, 
 
 ## Required next gate
 
-Complete the source-lock and signer provider spikes, then add a deterministic local-validator test harness. A human approval is required before enabling any network endpoint, remote signer, deployment key, vault funding, or bundle submission.
+Complete the immutable Jupiter Flashloan source-lock evidence and deterministic local fixtures, then qualify a signer provider and pin Jito relay semantics. Repository branch protection and code-owner enforcement remain unconfigured and must be applied before any merge. A human approval is required before enabling any network endpoint, remote signer, deployment key, vault funding, or bundle submission.
