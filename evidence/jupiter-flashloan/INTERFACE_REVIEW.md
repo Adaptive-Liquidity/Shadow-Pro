@@ -21,6 +21,10 @@ The captured immutable `flashloan` IDL reports program address `jupgfSgfuAXv4B6R
 
 The instructions sysvar and explicit IDL errors for missing/multiple payback and invalid instruction data indicate that the program enforces same-transaction repayment semantics. This is supportive evidence only. It does **not** replace independently decoding a constructed transaction, verifying all account ownership/relations, or pinning the exact artifact bytes.
 
+### Immutable-source availability boundary
+
+The immutable `jup-ag/jupiter-lend` tree at the captured commit exposes only three Rust reference files (`references/borrow/operate.rs`, `references/earn/deposit.rs`, and `references/earn/withdraw.rs`); it does not expose the deployed Flashloan program source. Consequently, the project cannot independently verify pause-state behavior or on-chain liquidity-account relation enforcement from source at this stage. Those properties remain **unverified** and the source lock must remain `blocked` pending first-party documentation or a sanctioned test fixture that proves them.
+
 ## Required evidence before pinning
 
 1. **Completed:** Retrieved `flashloan.json` by immutable full commit URL and captured the exact raw artifact.
