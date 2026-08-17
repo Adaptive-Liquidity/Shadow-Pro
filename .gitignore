@@ -1,0 +1,20 @@
+# Rust and Anchor build artifacts
+target/
+.anchor/
+
+# Local-only keys and runtime configuration
+.keys/
+.env
+.env.*
+*.keypair.json
+*.pem
+*.key
+
+# JavaScript dependencies and reports
+composer/node_modules/
+composer/coverage/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/

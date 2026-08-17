@@ -1,0 +1,29 @@
+{
+  "lock_version": "1.0",
+  "generated_at_utc": "2026-08-16T00:00:00Z",
+  "entries": [
+    {
+      "name": "shadow-paymaster-program",
+      "kind": "anchor-program",
+      "program_id": "ShdwPymstr111111111111111111111111111111111",
+      "idl_sha256": null,
+      "status": "local-only",
+      "implementation_gate": "A generated IDL hash and independently reviewed program ID are required before deployment."
+    },
+    {
+      "name": "jupiter-flashloan",
+      "kind": "external-program",
+      "program_id": "jupgfSgfuAXv4B6R2Uxu85Z1qdzgju79s6MfZekN6XS",
+      "idl_sha256": null,
+      "status": "blocked",
+      "implementation_gate": "Pin official Jupiter Lend target IDL commit, SHA-256, account map, and deterministic local fixture before enabling route composition."
+    },
+    {
+      "name": "jito-block-engine",
+      "kind": "relay",
+      "endpoint": null,
+      "status": "blocked",
+      "implementation_gate": "Pin authenticated submission endpoint, exact bundle-status semantics, and independent integration evidence before relay activation."
+    }
+  ]
+}
