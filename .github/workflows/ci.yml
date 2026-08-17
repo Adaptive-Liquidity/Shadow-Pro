@@ -41,6 +41,18 @@ jobs:
       - name: Verify source lock is intentionally fail-closed
         run: node scripts/check_source_lock.mjs
 
+      - name: Verify devnet readiness remains deny-by-default
+        run: node scripts/check_devnet_readiness.mjs
+
+      - name: Verify read-only devnet collector preflight
+        run: |
+          node --check scripts/collect_devnet_readiness_snapshot.mjs
+          if node scripts/collect_devnet_readiness_snapshot.mjs >/tmp/shadow-devnet-collector.out 2>&1; then
+            echo "collector must reject missing --agent before any network request"
+            exit 1
+          fi
+          grep -q 'Missing required argument --agent' /tmp/shadow-devnet-collector.out
+
       - name: Verify Rust formatting
         run: cargo fmt --check
 

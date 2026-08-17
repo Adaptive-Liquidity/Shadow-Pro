@@ -21,7 +21,7 @@
 | Repository secret-pattern check | Passed; no configured credential material or private-key-like file found. |
 | Source-lock check | Passed; external Jupiter and Jito dependencies remain fail-closed. |
 | Composer strict TypeScript build | Passed. |
-| Composer adversarial tests | **26 passed** across canonicalization, topology, destination, tip, freshness, profit, nonce replay, exact-message receipt verification, source lock, local zero-agent-capital/fee coverage, route/flash isolation, and fake-relay duplicate/expiry/status cases. |
+| Composer adversarial tests | **32 passed** across canonicalization, topology, destination, tip, freshness, profit, nonce replay, exact-message receipt verification, source lock, zero-agent-capital/fee coverage, route/flash isolation, fake-relay duplicate/expiry/status cases, and immutable Jupiter Flashloan instruction decoding. |
 | Composer production dependency audit | Passed; no known vulnerabilities reported. |
 | Anchor program formatting | Passed. |
 | Anchor program unit tests | 5 passed: program ID, exact 15/85 split, repayment shortfall, strict minimum, arithmetic overflow. |
@@ -36,9 +36,10 @@ The following are deliberate hard stops. Do not work around any of them with env
 1. **Jupiter Flashloan remains blocked.** Pin an immutable official target/IDL revision, SHA-256, account map, and a local fixture proving exact one-transaction borrow → route → repay semantics.
 2. **Jito relay remains blocked.** Pin the authenticated endpoint, status model, current tip-account retrieval, and a local or sanctioned non-production integration fixture.
 3. **Remote signer remains unselected.** Run the provider golden vector against exact Solana serialized messages, enforce idempotency and request expiry, and measure p99 latency before any signer becomes eligible.
-4. **No program ID or deployment key is approved.** The program currently uses the Anchor local template ID; it is not a deployment authorization.
-5. **No local validator integration test is approved.** Build one only after the source-locked external CPI interfaces are available; it must use local/mock dependencies and no real funds.
-6. **No runtime host is selected.** The current repository is a local build baseline, not a persistent execution service.
+4. **No program ID, deployment key, test payer, test mint, vault, or destination is approved.** The program currently uses the Anchor local template ID; it is not a deployment authorization.
+5. **Devnet readiness is preparation only.** `config/devnet-readiness.template.json`, `docs/DEVNET_PAYMASTER_READINESS.md`, and `scripts/collect_devnet_readiness_snapshot.mjs` preserve a deny-by-default project-owned paymaster test path. They do not authorize deployment, key creation, funding, signer connection, or transaction submission.
+6. **No mock-program substitution is permitted.** Jupiter Flashloan is not verified as deployed on devnet/testnet; therefore a real full flashloan test is blocked rather than simulated with a substitute program.
+7. **No runtime host is selected.** The current repository is a local build baseline, not a persistent execution service.
 
 ## Model-routing finding
 
@@ -46,4 +47,4 @@ The available Hugging Face integration was inspected. It exposes Hub discovery, 
 
 ## Required next gate
 
-Complete the immutable Jupiter Flashloan source-lock evidence and deterministic local fixtures, then qualify a signer provider and pin Jito relay semantics. Repository branch protection and code-owner enforcement remain unconfigured and must be applied before any merge. A human approval is required before enabling any network endpoint, remote signer, deployment key, vault funding, or bundle submission.
+The immediate next approval-bound stage is a project-owned Shadow Paymaster devnet test. Before requesting it, the review branch must pass the new devnet readiness CI guard and the approval request must name the exact commit, program artifact hash, test-only public accounts, configuration hash, transaction/fee caps, stop conditions, and zero-agent-SOL verification method. Jupiter remains a hard non-mainnet block; Jito testnet may be observed read-only only. A human approval is required before deployment, test-payer funding, transaction submission, remote signer connection, relay activation, or bundle submission.

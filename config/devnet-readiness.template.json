@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "environment": "devnet",
+  "mode": "readiness-only",
+  "execution_enabled": false,
+  "network_submission_enabled": false,
+  "signer_connection_enabled": false,
+  "jito_submission_enabled": false,
+  "jupiter_flashloan_enabled": false,
+  "deployment_enabled": false,
+  "funding_enabled": false,
+  "test_scope": "project-owned-paymaster-only",
+  "external_dependencies": {
+    "jupiter_flashloan": {
+      "status": "blocked",
+      "reason": "No official non-production deployment verified; mock substitution prohibited."
+    },
+    "jito_block_engine": {
+      "status": "read-only-testnet-observation-only",
+      "reason": "No bundle submission, authentication, or tip transfer is authorized."
+    },
+    "remote_signer": {
+      "status": "blocked",
+      "reason": "No provider connection or test identity is approved."
+    }
+  },
+  "required_unset_values": {
+    "program_id": null,
+    "deployment_authority_public_key": null,
+    "test_fee_payer_public_key": null,
+    "agent_public_key": null,
+    "governance_public_key": null,
+    "profit_mint": null,
+    "profit_vault": null,
+    "paymaster_destination": null,
+    "treasury_destination": null,
+    "rpc_endpoint": null,
+    "jito_endpoint": null,
+    "remote_signer_reference": null
+  },
+  "required_invariants": [
+    "agent_lamports_before == 0",
+    "agent_lamports_after == 0",
+    "agent_is_not_fee_payer",
+    "paymaster_is_paused_on_initialize",
+    "no_setup_instruction_in_protected_bundle",
+    "no_jupiter_or_jito_execution_on_devnet",
+    "test_configuration_hash_must_not_equal_any_production_configuration_hash"
+  ],
+  "approval_gates": {
+    "test_only_deployment": "explicit separate user approval required",
+    "test_payer_funding": "explicit separate user approval required",
+    "devnet_transaction_submission": "explicit separate user approval required",
+    "remote_signer_connection": "explicit separate user approval required",
+    "jito_testnet_submission": "explicit separate user approval required"
+  }
+}
