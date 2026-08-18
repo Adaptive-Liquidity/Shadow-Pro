@@ -6,7 +6,12 @@
 /config/** @Adaptive-Liquidity
 /scripts/** @Adaptive-Liquidity
 /.github/** @Adaptive-Liquidity
+/.manus/** @Adaptive-Liquidity
 /docs/** @Adaptive-Liquidity
+/evidence/** @Adaptive-Liquidity
 /audit/** @Adaptive-Liquidity
+/CODEOWNERS @Adaptive-Liquidity
 /Anchor.toml @Adaptive-Liquidity
 /Cargo.toml @Adaptive-Liquidity
+/Cargo.lock @Adaptive-Liquidity
+/composer/pnpm-lock.yaml @Adaptive-Liquidity
