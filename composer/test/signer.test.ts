@@ -38,4 +38,32 @@ describe('remote signing receipt verification', () => {
     const receipt = await validReceipt();
     await expect(verifySignReceipt(receipt, 'DifferentSigner11111111111111111111111111111', messageHash, new Date('2026-08-16T00:00:00.000Z'))).rejects.toThrow('SIGNER_PUBKEY_MISMATCH');
   });
+
+  it('rejects an invalid receipt expiry timestamp explicitly', async () => {
+    const receipt = await validReceipt();
+    receipt.expiresAt = 'not-a-timestamp';
+
+    await expect(verifySignReceipt(receipt, receipt.signerPubkey, messageHash, new Date('2026-08-16T00:00:00.000Z')))
+      .rejects.toThrow('SIGN_RECEIPT_EXPIRY_INVALID');
+  });
+
+  it('normalizes malformed Base58 signer bytes to a protocol encoding error', async () => {
+    const receipt = await validReceipt();
+    receipt.signerPubkey = '!!!not-base58!!!';
+
+    await expect(verifySignReceipt(receipt, receipt.signerPubkey, messageHash, new Date('2026-08-16T00:00:00.000Z')))
+      .rejects.toThrow('INVALID_ED25519_RECEIPT_ENCODING');
+  });
+
+  it('rejects malformed Base64 message and signature bytes before verification', async () => {
+    const malformedMessage = await validReceipt();
+    malformedMessage.serializedMessageBase64 = '%%%';
+    await expect(verifySignReceipt(malformedMessage, malformedMessage.signerPubkey, messageHash, new Date('2026-08-16T00:00:00.000Z')))
+      .rejects.toThrow('INVALID_ED25519_RECEIPT_ENCODING');
+
+    const malformedSignature = await validReceipt();
+    malformedSignature.signatureBase64 = '%%%';
+    await expect(verifySignReceipt(malformedSignature, malformedSignature.signerPubkey, messageHash, new Date('2026-08-16T00:00:00.000Z')))
+      .rejects.toThrow('INVALID_ED25519_RECEIPT_ENCODING');
+  });
 });
