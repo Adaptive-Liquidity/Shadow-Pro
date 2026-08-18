@@ -3,9 +3,9 @@ import * as ed25519 from '@noble/ed25519';
 import bs58 from 'bs58';
 import { sha256Hex } from './canonical.js';
 
-ed25519.etc.sha512Async = async (...messages: Uint8Array[]): Promise<Uint8Array> => {
-  const digest = createHash('sha512').update(Buffer.concat(messages.map((message) => Buffer.from(message)))).digest();
-  return new Uint8Array(digest);
+ed25519.hashes.sha512Async = async (message: Uint8Array): Promise<Uint8Array<ArrayBuffer>> => {
+  const digest = createHash('sha512').update(Buffer.from(message)).digest();
+  return new Uint8Array(digest.buffer.slice(digest.byteOffset, digest.byteOffset + digest.byteLength));
 };
 
 function decodeCanonicalBase64(value: string): Buffer {
