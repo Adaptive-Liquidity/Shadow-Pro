@@ -101,6 +101,15 @@ jobs:
       - name: Audit Rust dependencies
         run: cargo audit
 
+      - name: Install cargo-auditable
+        uses: taiki-e/install-action@5b4d68e2e660441203ab128a23676f1e4faf1532 # v2
+        with:
+          tool: cargo-auditable@0.7.5
+          fallback: none
+
+      - name: Build auditable Shadow Paymaster artifact
+        run: cargo auditable build --locked -p shadow_paymaster
+
       - name: Install composer dependencies
         working-directory: composer
         run: pnpm install --frozen-lockfile
@@ -116,3 +125,22 @@ jobs:
       - name: Audit composer dependencies
         working-directory: composer
         run: pnpm audit --prod --audit-level high
+
+      - name: Generate SBOM and artifact hashes
+        if: always()
+        run: |
+          mkdir -p artifacts/sbom
+          (
+            cd composer
+            pnpm sbom --prod --sbom-format cyclonedx
+          ) > artifacts/sbom/composer.cyclonedx.json
+          sha256sum Cargo.lock composer/pnpm-lock.yaml artifacts/sbom/composer.cyclonedx.json > artifacts/sbom/SHA256SUMS
+
+      - name: Upload SBOM evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: shadow-pro-sbom-${{ github.sha }}
+          path: artifacts/sbom/
+          if-no-files-found: error
+          retention-days: 30
