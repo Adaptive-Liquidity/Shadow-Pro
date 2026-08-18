@@ -113,6 +113,11 @@ export interface GatePolicy {
   policyHash: string;
   agentPubkey: string;
   paymasterFeePayer: string;
+  paymasterProgramId: string;
+  configPubkey: string;
+  vaultAuthorityPubkey: string;
+  profitVault: string;
+  tokenProgramId: string;
   allowedProgramIds: ReadonlySet<string>;
   allowedAddressLookupTables: ReadonlySet<string>;
   currentJitoTipAccounts: ReadonlySet<string>;

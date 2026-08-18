@@ -128,6 +128,48 @@ function decodeBoundedJitoTip(
   return undefined;
 }
 
+function validateFixedSettlementInstruction(
+  transaction: DecodedTransaction,
+  policy: GatePolicy,
+  manifest: TransactionManifest,
+): GateDecision | undefined {
+  const instruction = transaction.instructions[0];
+  if (!instruction || instruction.programId !== policy.paymasterProgramId) {
+    return reject('SETTLEMENT_PROGRAM_BINDING_INVALID', 'Settlement instruction must invoke the source-locked paymaster program.');
+  }
+  const expectedIndices = [0, 1, 2, 3, 4, 5, 6];
+  if (instruction.accountIndices.length !== expectedIndices.length || instruction.accountIndices.some((index, position) => index !== expectedIndices[position])) {
+    return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', 'Settlement instruction account indices do not match the immutable paymaster account order.');
+  }
+
+  const destination = transaction.role === 'distribute_profit'
+    ? policy.paymasterDestination
+    : policy.treasuryDestination;
+  const expected = [
+    { pubkey: policy.configPubkey, signer: false, writable: false, ownerProgram: policy.paymasterProgramId },
+    { pubkey: policy.vaultAuthorityPubkey, signer: false, writable: false },
+    { pubkey: manifest.settlement.settlementPda, signer: false, writable: true, ownerProgram: policy.paymasterProgramId },
+    { pubkey: policy.allowedProfitMint, signer: false, writable: false, ownerProgram: policy.tokenProgramId },
+    { pubkey: policy.profitVault, signer: false, writable: true, ownerProgram: policy.tokenProgramId },
+    { pubkey: destination, signer: false, writable: true, ownerProgram: policy.tokenProgramId },
+    { pubkey: policy.tokenProgramId, signer: false, writable: false },
+  ];
+
+  for (const [index, binding] of expected.entries()) {
+    const actual = transaction.accountMetas[index];
+    if (
+      !actual
+      || actual.pubkey !== binding.pubkey
+      || actual.isSigner !== binding.signer
+      || actual.isWritable !== binding.writable
+      || (binding.ownerProgram !== undefined && actual.ownerProgram !== binding.ownerProgram)
+    ) {
+      return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', `Settlement account ${index} differs from the source-locked binding.`);
+    }
+  }
+  return undefined;
+}
+
 function transactionIsolationError(transaction: DecodedTransaction): GateDecision | undefined {
   if (transaction.index === 0) return undefined;
   if (transaction.instructions.some((instruction) => instruction.classifier === 'route')) {
@@ -197,6 +239,10 @@ export function validateManifest(manifest: TransactionManifest, policy: GatePoli
     if (!hasOnlyAllowedAccounts(transaction, policy)) return reject('ACCOUNT_OR_ALT_DENIED', `Transaction ${transaction.index} contains an unapproved account owner or lookup table.`);
     const signerError = validateSignerGraph(transaction, policy);
     if (signerError) return signerError;
+    if (transaction.role === 'distribute_profit' || transaction.role === 'treasury_settle_and_tip') {
+      const settlementError = validateFixedSettlementInstruction(transaction, policy, manifest);
+      if (settlementError) return settlementError;
+    }
     if (transaction.role === 'treasury_settle_and_tip') {
       const tipError = decodeBoundedJitoTip(transaction, policy, manifest);
       if (tipError) return tipError;
