@@ -37,23 +37,46 @@ function exactRoles(transactions: readonly DecodedTransaction[]): boolean {
   });
 }
 
-function hasExpectedSequence(instructions: readonly DecodedInstruction[]): boolean {
+function occursExactlyOnce(classes: readonly DecodedInstruction['classifier'][], classifier: DecodedInstruction['classifier']): boolean {
+  return classes.filter((value) => value === classifier).length === 1;
+}
+
+function hasCanonicalExecutionSequence(instructions: readonly DecodedInstruction[]): boolean {
   const classes = instructions.map((instruction) => instruction.classifier);
+  const requiredOnce: readonly DecodedInstruction['classifier'][] = [
+    'compute_budget',
+    'dontfront',
+    'paymaster_begin',
+    'flash_borrow',
+    'flash_repay',
+    'paymaster_finalize',
+  ];
+  if (!requiredOnce.every((classifier) => occursExactlyOnce(classes, classifier))) return false;
+  if (classes[0] !== 'compute_budget' || classes[1] !== 'dontfront') return false;
+
   const begin = classes.indexOf('paymaster_begin');
   const borrow = classes.indexOf('flash_borrow');
   const repay = classes.indexOf('flash_repay');
   const finalize = classes.indexOf('paymaster_finalize');
-  return begin >= 0 && borrow > begin && repay > borrow && finalize > repay;
+  const routeIndices = classes
+    .map((classifier, index) => (classifier === 'route' ? index : -1))
+    .filter((index) => index >= 0);
+
+  return begin === 2
+    && borrow === begin + 1
+    && routeIndices.length > 0
+    && routeIndices.every((index) => index > borrow && index < repay)
+    && repay > borrow
+    && finalize === repay + 1
+    && finalize === classes.length - 1;
 }
 
 function hasRequiredClassifiers(transaction: DecodedTransaction): boolean {
   const classes = transaction.instructions.map((instruction) => instruction.classifier);
-  const required = REQUIRED_CLASSIFIERS[transaction.role];
-  if (!required.every((classifier) => classes.includes(classifier))) return false;
   if (!classes.every((classifier) => ALLOWED_CLASSIFIERS[transaction.role].includes(classifier))) return false;
-  if (transaction.role === 'execute_flash_route') return hasExpectedSequence(transaction.instructions);
-  if (transaction.role === 'treasury_settle_and_tip') return classes.at(-1) === 'jito_tip';
-  return true;
+  if (transaction.role === 'execute_flash_route') return hasCanonicalExecutionSequence(transaction.instructions);
+  if (transaction.role === 'distribute_profit') return classes.length === 1 && classes[0] === 'distribute';
+  return classes.length === 2 && classes[0] === 'treasury_settle' && classes[1] === 'jito_tip';
 }
 
 function transactionIsolationError(transaction: DecodedTransaction): GateDecision | undefined {

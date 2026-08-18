@@ -248,6 +248,27 @@ describe('protected-bundle isolation', () => {
     expect(validateManifest(candidate, policy()).code).toBe('UNEXPECTED_INSTRUCTION_CLASSIFIER');
   });
 
+  it('rejects a duplicated flash repayment instruction', () => {
+    const candidate = manifest();
+    candidate.transactions[0].instructions.splice(6, 0, instruction(6, 'flash_repay', FLASH_PROGRAM));
+
+    expect(validateManifest(candidate, policy()).code).toBe('INSTRUCTION_TOPOLOGY_INVALID');
+  });
+
+  it('rejects a missing route between flash borrow and repayment', () => {
+    const candidate = manifest();
+    candidate.transactions[0].instructions = candidate.transactions[0].instructions.filter((ix) => ix.classifier !== 'route');
+
+    expect(validateManifest(candidate, policy()).code).toBe('INSTRUCTION_TOPOLOGY_INVALID');
+  });
+
+  it('rejects an allowed route classifier after paymaster finalization', () => {
+    const candidate = manifest();
+    candidate.transactions[0].instructions.push(instruction(7, 'route', FLASH_PROGRAM));
+
+    expect(validateManifest(candidate, policy()).code).toBe('INSTRUCTION_TOPOLOGY_INVALID');
+  });
+
   it('rejects a jito tip that is not the final instruction of TX-3', () => {
     const candidate = manifest();
     candidate.transactions[2].instructions.push(instruction(2, 'treasury_settle', PAYMASTER_PROGRAM));
