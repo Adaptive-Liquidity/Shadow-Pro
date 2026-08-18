@@ -1,0 +1,75 @@
+name: Security Baseline CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Deterministic validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: composer/pnpm-lock.yaml
+
+      - name: Reject credential material
+        run: bash scripts/check_secrets.sh
+
+      - name: Verify source lock is intentionally fail-closed
+        run: node scripts/check_source_lock.mjs
+
+      - name: Verify devnet readiness remains deny-by-default
+        run: node scripts/check_devnet_readiness.mjs
+
+      - name: Verify read-only devnet collector preflight
+        run: |
+          node --check scripts/collect_devnet_readiness_snapshot.mjs
+          if node scripts/collect_devnet_readiness_snapshot.mjs >/tmp/shadow-devnet-collector.out 2>&1; then
+            echo "collector must reject missing --agent before any network request"
+            exit 1
+          fi
+          grep -q 'Missing required argument --agent' /tmp/shadow-devnet-collector.out
+
+      - name: Verify Rust formatting
+        run: cargo fmt --check
+
+      - name: Test Shadow Paymaster
+        run: cargo test -p shadow_paymaster
+
+      - name: Check Shadow Paymaster
+        run: cargo check -p shadow_paymaster
+
+      - name: Install composer dependencies
+        working-directory: composer
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and test composer
+        working-directory: composer
+        run: pnpm build && pnpm test
+
+      - name: Dependency audit
+        working-directory: composer
+        run: pnpm audit --prod --audit-level high

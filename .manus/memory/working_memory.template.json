@@ -1,0 +1,22 @@
+{
+  "project_scope": "Shadow Account Protocol",
+  "repository": "Adaptive-Liquidity/Shadow-Pro",
+  "candidate_commit": null,
+  "objective": null,
+  "requirements": [],
+  "constraints": [
+    "No deployment, funding, key handling, signer connection, signing, transaction submission, relay activation, or source-lock enablement without separately approved evidence."
+  ],
+  "assumptions": [],
+  "files_inspected": [],
+  "files_changed": [],
+  "commands_run": [],
+  "tests_run": [],
+  "failures": [],
+  "open_questions": [],
+  "risk_level": "unknown",
+  "next_action": null,
+  "updated_at_utc": null,
+  "provenance": null,
+  "verification_status": "candidate"
+}

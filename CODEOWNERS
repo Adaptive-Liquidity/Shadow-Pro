@@ -1,0 +1,18 @@
+# Shadow Account Protocol — required review ownership
+# @Adaptive-Liquidity is the accountable repository owner and final reviewer.
+# Owner review evidence uses docs/governance/OWNER_EXTERNAL_REVIEW_SIGNOFF.md.
+
+/programs/** @Adaptive-Liquidity
+/composer/** @Adaptive-Liquidity
+/config/** @Adaptive-Liquidity
+/scripts/** @Adaptive-Liquidity
+/.github/** @Adaptive-Liquidity
+/.manus/** @Adaptive-Liquidity
+/docs/** @Adaptive-Liquidity
+/evidence/** @Adaptive-Liquidity
+/audit/** @Adaptive-Liquidity
+/CODEOWNERS @Adaptive-Liquidity
+/Anchor.toml @Adaptive-Liquidity
+/Cargo.toml @Adaptive-Liquidity
+/Cargo.lock @Adaptive-Liquidity
+/composer/pnpm-lock.yaml @Adaptive-Liquidity

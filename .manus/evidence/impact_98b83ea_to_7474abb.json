@@ -1,0 +1,148 @@
+{
+  "affected_anchor_inventory": [],
+  "affected_docs_to_review": [
+    {
+      "language": "markdown",
+      "line_count": 50,
+      "path": "docs/BUILD_STATUS.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 48,
+      "path": "docs/DEVNET_PAYMASTER_READINESS.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 71,
+      "path": "docs/DEVNET_TEST_APPROVAL_TEMPLATE.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 20,
+      "path": "docs/EXECUTION_GATES_STATUS.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 24,
+      "path": "docs/GITHUB_GOVERNANCE.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 42,
+      "path": "docs/MODEL_ROUTING.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 32,
+      "path": "docs/PROJECT_ARTIFACTS.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 39,
+      "path": "docs/REMOTE_SIGNER_QUALIFICATION.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 36,
+      "path": "docs/THREAT_MODEL.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 404,
+      "path": "docs/archive/PLAN_V1.1.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 64,
+      "path": "docs/archive/shadow_account_evidence_notes.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 166,
+      "path": "docs/evidence/SHADOW_NON_MAINNET_RESEARCH_EVIDENCE.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 153,
+      "path": "docs/plans/END_TO_END_BUILD_PLAN.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 109,
+      "path": "docs/plans/INTEGRATION_RESEARCH_PROMPT.md"
+    },
+    {
+      "language": "markdown",
+      "line_count": 98,
+      "path": "docs/project/SHADOW_ACCOUNT_VERIFIED_STATE.md"
+    }
+  ],
+  "affected_symbols": [
+    "ACCOUNT_RULES",
+    "ASSOCIATED_TOKEN_PROGRAM",
+    "BORROW",
+    "BORROW_DISCRIMINATOR",
+    "CompiledAccountMeta",
+    "CompiledFlashloanInstruction",
+    "DecodedFlashloanInstruction",
+    "FlashloanDecodeError",
+    "FlashloanInstructionKind",
+    "FlashloanOccurrence",
+    "INSTRUCTION_SYSVAR",
+    "JUPITER_FLASHLOAN_IDL_SHA256",
+    "JUPITER_FLASHLOAN_PROGRAM_ID",
+    "PAYBACK",
+    "PAYBACK_DISCRIMINATOR",
+    "SYSTEM_PROGRAM",
+    "account",
+    "accountMetas",
+    "actual",
+    "amount",
+    "borrow",
+    "candidate",
+    "classifyDiscriminator",
+    "data",
+    "decodeJupiterFlashloanInstruction",
+    "decoded",
+    "exactBase64Bytes",
+    "expectCode",
+    "firstByte",
+    "flashInstruction",
+    "kind",
+    "malformedBase64",
+    "omitted",
+    "payback",
+    "shortData",
+    "surplus",
+    "unknownData",
+    "unknownDiscriminator",
+    "validateAccounts",
+    "validateFlashloanBorrowPaybackPair",
+    "wrongProgram"
+  ],
+  "affected_tests_to_review": [
+    "composer/test/fake-relay.test.ts",
+    "composer/test/gate.test.ts",
+    "composer/test/jupiter-flashloan.test.ts",
+    "composer/test/local-harness.test.ts",
+    "composer/test/signer.test.ts",
+    "composer/test/source-lock.test.ts",
+    "programs/shadow_paymaster/src/lib.rs"
+  ],
+  "base_commit": "98b83ead9be57fe9f780aeb6b6c0a9b524cb9ce7",
+  "changed_files": [
+    "composer/src/jupiter-flashloan.ts",
+    "composer/test/jupiter-flashloan.test.ts"
+  ],
+  "generated_at_utc": "2026-08-18T10:05:24+00:00",
+  "head_commit": "7474abb1fe49f45458ba69e5cc3becbbdaefd5f7",
+  "limitations": [
+    "No full Rust or TypeScript AST/call graph is claimed by this standard-library implementation.",
+    "Static inventory does not prove runtime reachability or account validation correctness.",
+    "Every index result must be verified against the named source commit before use."
+  ],
+  "release_risk": "high",
+  "schema_version": "1.0",
+  "source_lock_implication": "none detected by static heuristic",
+  "verification_status": "candidate"
+}

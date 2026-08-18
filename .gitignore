@@ -1,0 +1,30 @@
+# Rust and Anchor build artifacts
+target/
+.anchor/
+
+# Local-only keys and runtime configuration
+.keys/
+.env
+.env.*
+*.keypair.json
+*.pem
+*.key
+
+# JavaScript dependencies and reports
+composer/node_modules/
+composer/coverage/
+
+# Project-local memory runtime data (tracked specifications and reviewed exports remain allowed)
+.manus/memory/engineering_memory.sqlite
+.manus/memory/engineering_memory.jsonl
+.manus/memory/working_memory.json
+.manus/index/repository_index.json
+.manus/metrics/*.generated.json
+.manus/evidence/local/
+__pycache__/
+*.pyc
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
