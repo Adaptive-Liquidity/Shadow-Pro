@@ -276,11 +276,7 @@ fn transfer_from_vault<'info>(
         authority: accounts.vault_authority.to_account_info(),
     };
     token::transfer_checked(
-        CpiContext::new_with_signer(
-            accounts.token_program.key(),
-            cpi_accounts,
-            signer,
-        ),
+        CpiContext::new_with_signer(accounts.token_program.key(), cpi_accounts, signer),
         amount,
         accounts.profit_mint.decimals,
     )
