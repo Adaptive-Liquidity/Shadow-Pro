@@ -85,6 +85,10 @@ pub mod shadow_paymaster {
 
     pub fn finalize_settlement(ctx: Context<FinalizeSettlement>) -> Result<()> {
         let clock = Clock::get()?;
+        validate_configured_profit_vault(
+            ctx.accounts.profit_vault.key(),
+            ctx.accounts.config.profit_vault,
+        )?;
         let settlement = &mut ctx.accounts.settlement;
         require!(!ctx.accounts.config.paused, ShadowError::ProtocolPaused);
         require!(clock.slot < settlement.expiry_slot, ShadowError::Expired);
@@ -168,6 +172,11 @@ pub mod shadow_paymaster {
         });
         Ok(())
     }
+}
+
+fn validate_configured_profit_vault(actual_vault: Pubkey, configured_vault: Pubkey) -> Result<()> {
+    require_keys_eq!(actual_vault, configured_vault, ShadowError::UnexpectedVault);
+    Ok(())
 }
 
 fn calculate_profit_split(
@@ -340,6 +349,7 @@ pub struct FinalizeSettlement<'info> {
     #[account(address = config.profit_mint @ ShadowError::UnexpectedMint)]
     pub profit_mint: Account<'info, Mint>,
     #[account(
+        address = config.profit_vault @ ShadowError::UnexpectedVault,
         token::mint = profit_mint,
         token::authority = vault_authority,
         token::token_program = token_program
@@ -500,6 +510,28 @@ pub struct TreasurySettled {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finalize_rejects_substitute_vault() {
+        let configured_vault = Pubkey::new_unique();
+        let substitute_vault = Pubkey::new_unique();
+
+        let error = validate_configured_profit_vault(substitute_vault, configured_vault)
+            .expect_err("a substitute vault must be rejected");
+
+        assert!(error
+            .to_string()
+            .contains("error_name: \"UnexpectedVault\""));
+    }
+
+    #[test]
+    fn finalize_accepts_configured_vault() {
+        let configured_vault = Pubkey::new_unique();
+
+        let result = validate_configured_profit_vault(configured_vault, configured_vault);
+
+        assert!(result.is_ok());
+    }
 
     #[test]
     fn profit_split_uses_exact_fifteen_eighty_five_remainder() {
