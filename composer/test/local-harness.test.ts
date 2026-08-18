@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { executeLocalProtectedBundle, type LocalLedger } from '../src/local-harness.js';
+import type { SourceLock } from '../src/source-lock.js';
 import type { GatePolicy, TransactionManifest } from '../src/types.js';
 
 const AGENT = 'Agent111111111111111111111111111111111111111';
@@ -50,13 +51,26 @@ function makeManifest(): TransactionManifest {
   };
 }
 
+function makePinnedSourceLock(): SourceLock {
+  return {
+    lock_version: '1.0',
+    generated_at_utc: '2026-08-18T00:00:00Z',
+    entries: [
+      { name: 'shadow-paymaster-program', kind: 'anchor-program', program_id: PAYMASTER_PROGRAM, idl_sha256: 'a'.repeat(64), status: 'pinned', implementation_gate: 'complete' },
+      { name: 'jupiter-flashloan', kind: 'external-program', program_id: FLASH_PROGRAM, idl_sha256: 'b'.repeat(64), status: 'pinned', implementation_gate: 'complete' },
+      { name: 'jito-block-engine', kind: 'relay', endpoint: 'https://relay.example', status: 'pinned', implementation_gate: 'complete' },
+    ],
+  };
+}
+
 function makePolicy(): GatePolicy {
   return {
     policyHash: 'p'.repeat(64), agentPubkey: AGENT, paymasterFeePayer: PAYMASTER,
     allowedProgramIds: new Set([PAYMASTER_PROGRAM, FLASH_PROGRAM, SYSTEM_PROGRAM, COMPUTE_PROGRAM, DONTFRONT_PROGRAM]),
     allowedAddressLookupTables: new Set([ALT]), currentJitoTipAccounts: new Set([TIP_ACCOUNT]), allowedProfitMint: PROFIT_MINT,
     paymasterDestination: PAYMASTER_DESTINATION, treasuryDestination: TREASURY_DESTINATION, maxComputeUnitLimit: 500_000n,
-    currentSlot: 100n, activeNonceSet: new Set(), sourceLockAllowsExecution: true, protocolPaused: false,
+    currentSlot: 100n, activeNonceSet: new Set(), sourceLock: makePinnedSourceLock(),
+    requiredSourceLockEntries: ['shadow-paymaster-program', 'jupiter-flashloan', 'jito-block-engine'], protocolPaused: false,
   };
 }
 

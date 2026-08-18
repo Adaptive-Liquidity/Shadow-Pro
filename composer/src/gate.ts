@@ -1,4 +1,5 @@
 import { checkedProfitSplit, manifestHash } from './canonical.js';
+import { sourceLockAllowsExecution } from './source-lock.js';
 import type {
   DecodedInstruction,
   DecodedTransaction,
@@ -93,7 +94,9 @@ function validateSignerGraph(transaction: DecodedTransaction, policy: GatePolicy
 
 export function validateManifest(manifest: TransactionManifest, policy: GatePolicy): GateDecision {
   if (policy.protocolPaused) return reject('PROTOCOL_PAUSED', 'The active policy is paused.');
-  if (!policy.sourceLockAllowsExecution) return reject('SOURCE_LOCK_BLOCKED', 'A dependency remains blocked or unpinned.');
+  if (!sourceLockAllowsExecution(policy.sourceLock, policy.requiredSourceLockEntries)) {
+    return reject('SOURCE_LOCK_BLOCKED', 'A dependency remains blocked, malformed, missing, or unpinned.');
+  }
   if (manifest.policyHash !== policy.policyHash) return reject('POLICY_HASH_MISMATCH', 'Manifest policy does not equal active policy.');
   if (policy.activeNonceSet.has(manifest.approvalNonce)) return reject('NONCE_REUSED', 'Approval nonce is already active or consumed.');
   if (!exactRoles(manifest.transactions)) return reject('TOPOLOGY_INVALID', 'Bundle must contain exactly the canonical three transactions.');

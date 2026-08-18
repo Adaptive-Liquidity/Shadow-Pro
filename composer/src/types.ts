@@ -1,3 +1,5 @@
+import type { SourceLock } from './source-lock.js';
+
 export const SETTLEMENT_ROLES = [
   'execute_flash_route',
   'distribute_profit',
@@ -119,7 +121,8 @@ export interface GatePolicy {
   maxComputeUnitLimit: bigint;
   currentSlot: bigint;
   activeNonceSet: ReadonlySet<string>;
-  sourceLockAllowsExecution: boolean;
+  sourceLock: SourceLock;
+  requiredSourceLockEntries: readonly string[];
   protocolPaused: boolean;
 }
 

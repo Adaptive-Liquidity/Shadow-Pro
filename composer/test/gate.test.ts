@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJson, checkedProfitSplit, manifestHash } from '../src/canonical.js';
 import { validateManifest } from '../src/gate.js';
+import type { SourceLock } from '../src/source-lock.js';
 import type { GatePolicy, TransactionManifest } from '../src/types.js';
 
 const AGENT = 'Agent111111111111111111111111111111111111111';
@@ -49,6 +50,38 @@ function transaction(
   };
 }
 
+function pinnedExecutionLock(): SourceLock {
+  return {
+    lock_version: '1.0',
+    generated_at_utc: '2026-08-18T00:00:00Z',
+    entries: [
+      {
+        name: 'shadow-paymaster-program',
+        kind: 'anchor-program',
+        program_id: PAYMASTER_PROGRAM,
+        idl_sha256: 'a'.repeat(64),
+        status: 'pinned',
+        implementation_gate: 'complete',
+      },
+      {
+        name: 'jupiter-flashloan',
+        kind: 'external-program',
+        program_id: FLASH_PROGRAM,
+        idl_sha256: 'b'.repeat(64),
+        status: 'pinned',
+        implementation_gate: 'complete',
+      },
+      {
+        name: 'jito-block-engine',
+        kind: 'relay',
+        endpoint: 'https://relay.example',
+        status: 'pinned',
+        implementation_gate: 'complete',
+      },
+    ],
+  };
+}
+
 function policy(): GatePolicy {
   return {
     policyHash: 'p'.repeat(64),
@@ -63,7 +96,8 @@ function policy(): GatePolicy {
     maxComputeUnitLimit: 500_000n,
     currentSlot: 100n,
     activeNonceSet: new Set(),
-    sourceLockAllowsExecution: true,
+    sourceLock: pinnedExecutionLock(),
+    requiredSourceLockEntries: ['shadow-paymaster-program', 'jupiter-flashloan', 'jito-block-engine'],
     protocolPaused: false,
   };
 }
@@ -146,6 +180,15 @@ describe('canonical approval controls', () => {
 describe('deterministic execution gate', () => {
   it('allows the canonical source-locked fixture', () => {
     expect(validateManifest(manifest(), policy())).toMatchObject({ allowed: true, code: 'ALLOW' });
+  });
+
+  it('rejects a caller policy when the actual source lock is blocked', () => {
+    const candidatePolicy = policy();
+    const jupiter = candidatePolicy.sourceLock.entries.find((entry) => entry.name === 'jupiter-flashloan');
+    if (!jupiter) throw new Error('fixture is missing the Jupiter source-lock entry');
+    jupiter.status = 'blocked';
+
+    expect(validateManifest(manifest(), candidatePolicy).code).toBe('SOURCE_LOCK_BLOCKED');
   });
 
   it('rejects a non-first DontFront transaction topology', () => {
