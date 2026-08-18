@@ -1,8 +1,8 @@
 # Gate D F-008: CI Toolchain and Action Pinning
 
-**Candidate branch:** `manus/gate-d-hardening`  
-**Base commit:** `7ed366454a1e87ad09d78ea50933992ee33b9257`  
-**Scope:** Immutable GitHub Action pins, Node 24 CI baseline, Rust toolchain pin, Composer engine declaration, and review-only Dependabot configuration.  
+**Candidate branch:** `manus/gate-d-hardening`
+**Base commit:** `7ed366454a1e87ad09d78ea50933992ee33b9257`
+**Scope:** Immutable GitHub Action pins, Node 24 CI baseline, Rust toolchain pin, Composer engine declaration, and review-only Dependabot configuration.
 **Execution boundary:** This change does not deploy, fund, sign, connect a signer, enable a source lock, submit a relay bundle, or perform public-network execution.
 
 ## Changes
@@ -44,3 +44,17 @@ SBOM generation, reproducible Anchor artifacts, property/fuzz testing, devnet gu
 [2]: https://github.com/actions/setup-node/tree/820762786026740c76f36085b0efc47a31fe5020 "actions/setup-node pin"
 [3]: https://github.com/pnpm/action-setup/tree/f40ffcd9367d9f12939873eb1018b921a783ffaa "pnpm/action-setup pin"
 [4]: https://github.com/dtolnay/rust-toolchain/tree/4360b52568e2003a75bf9bc1d59f33a8e3fc893c "dtolnay/rust-toolchain pin"
+
+## OpenAI/ChatGPT Review Record
+
+**Provider/model:** OpenAI `gpt-5.4`
+**Reviewed candidate:** `561fbdb1a866b675e59fda448763430105295c0e`
+**Prompt artifact:** `/home/ubuntu/request_gate_d_openai_review.py`
+**Structured output:** `.manus/evidence/OPENAI_GATE_D_CI_REVIEW.json`
+
+The model review returned `needs_changes` with three evidence-cited reproducibility findings. All three were independently checked and addressed in the successor candidate: pnpm is pinned from floating major `11` to `11.21.0`; the Composer engine range is bounded from `>=24.0.0` to `>=24.0.0 <25.0.0`, while workflows pin Node `24.19.0`; and CI now asserts Rust `1.97.1`, `rustfmt`, and `clippy` after reading `rust-toolchain.toml`. The review also identified floating `cargo-audit` installation; this was independently confirmed and changed to `cargo-audit 0.22.2`, the current official crates.io release requiring Rust 1.88 or later.
+
+The model output was advisory only. The accepted changes were based on the committed workflow diff, the local toolchain inventory, the live Node 24 release index, the official cargo-audit crate metadata, and subsequent deterministic CI validation.
+
+[5]: https://nodejs.org/dist/index.json "Node.js release index"
+[6]: https://crates.io/api/v1/crates/cargo-audit "cargo-audit crate metadata"

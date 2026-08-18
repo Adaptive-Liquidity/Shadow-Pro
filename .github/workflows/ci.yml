@@ -45,20 +45,26 @@ jobs:
             evidence/**/*.md
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable at 2026-08-18
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch resolved 2026-08-18
+
+      - name: Verify pinned Rust toolchain and components
+        run: |
+          rustc --version | grep -F '1.97.1'
+          rustup component list --installed | grep -E '^rustfmt(-|$)'
+          rustup component list --installed | grep -E '^clippy(-|$)'
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        run: cargo install cargo-audit --version 0.22.2 --locked
 
       - name: Install pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 11
+          version: 11.21.0
 
       - name: Install Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: pnpm
           cache-dependency-path: composer/pnpm-lock.yaml
 
