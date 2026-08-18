@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalJson, checkedProfitSplit, manifestHash } from '../src/canonical.js';
+import { canonicalJson, checkedProfitSplit, manifestHash, parseAtomicUnits } from '../src/canonical.js';
 import { validateManifest } from '../src/gate.js';
 import type { SourceLock } from '../src/source-lock.js';
 import type { GatePolicy, TransactionManifest } from '../src/types.js';
@@ -192,6 +192,11 @@ describe('canonical approval controls', () => {
       paymasterShare: 2_250n,
       treasuryShare: 12_750n,
     });
+  });
+
+  it('accepts the maximum u64 atomic amount and rejects the next integer', () => {
+    expect(parseAtomicUnits('18446744073709551615', 'amount')).toBe(18_446_744_073_709_551_615n);
+    expect(() => parseAtomicUnits('18446744073709551616', 'amount')).toThrow('exceeds the maximum u64');
   });
 });
 
