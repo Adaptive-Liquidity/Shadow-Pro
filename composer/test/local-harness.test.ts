@@ -62,11 +62,14 @@ function makeManifest(): TransactionManifest {
     requiredSigners: [{ pubkey: AGENT, role: 'agent_intent' as const }, { pubkey: PAYMASTER, role: 'paymaster_fee_payer' as const }],
     instructions,
     accountMetas: role === 'distribute_profit'
-      ? settlementAccountMetas(PAYMASTER_DESTINATION)
+      ? [
+        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        ...settlementAccountMetas(PAYMASTER_DESTINATION),
+      ]
       : role === 'treasury_settle_and_tip'
         ? [
-          ...settlementAccountMetas(TREASURY_DESTINATION),
           { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+          ...settlementAccountMetas(TREASURY_DESTINATION),
           { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
         ]
         : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
@@ -78,10 +81,10 @@ function makeManifest(): TransactionManifest {
     ix(0, 'compute_budget', COMPUTE_PROGRAM), ix(1, 'dontfront', DONTFRONT_PROGRAM), ix(2, 'paymaster_begin', PAYMASTER_PROGRAM),
     ix(3, 'flash_borrow', FLASH_PROGRAM), ix(4, 'route', FLASH_PROGRAM), ix(5, 'flash_repay', FLASH_PROGRAM), ix(6, 'paymaster_finalize', PAYMASTER_PROGRAM),
   ]);
-  const tx1 = tx(1, 'distribute_profit', [ix(0, 'distribute', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6])]);
+  const tx1 = tx(1, 'distribute_profit', [ix(0, 'distribute', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7])]);
   const tx2 = tx(2, 'treasury_settle_and_tip', [
-    ix(0, 'treasury_settle', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6]),
-    ix(1, 'jito_tip', SYSTEM_PROGRAM, [7, 8], systemTransferDataBase64(500n)),
+    ix(0, 'treasury_settle', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7]),
+    ix(1, 'jito_tip', SYSTEM_PROGRAM, [0, 8], systemTransferDataBase64(500n)),
   ]);
   return {
     schemaVersion: '1.1', manifestId: '00000000-0000-7000-8000-000000000002', approvalNonce: 'l'.repeat(64), policyHash: 'p'.repeat(64), createdAt: '2026-08-16T00:00:00.000Z',

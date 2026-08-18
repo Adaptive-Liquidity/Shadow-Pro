@@ -18,7 +18,7 @@ For both distribution and treasury settlement, the first instruction must invoke
 | 5 | Fixed paymaster or treasury destination, writable |
 | 6 | Source-locked SPL Token Program |
 
-The policy contains these source-derived bindings; manifest-declared settlement destination fields do not replace the decoded account checks.
+The policy contains these source-derived bindings; manifest-declared settlement destination fields do not replace the decoded account checks. Instruction `accountIndices` address the transaction-wide account-key list (index 0 is the fee payer in a compiled message), so the gate resolves the seven referenced metas through the instruction's indices in the order above instead of requiring absolute transaction positions.
 
 ## Deterministic regression coverage
 

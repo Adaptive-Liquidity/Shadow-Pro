@@ -137,9 +137,11 @@ function validateFixedSettlementInstruction(
   if (!instruction || instruction.programId !== policy.paymasterProgramId) {
     return reject('SETTLEMENT_PROGRAM_BINDING_INVALID', 'Settlement instruction must invoke the source-locked paymaster program.');
   }
-  const expectedIndices = [0, 1, 2, 3, 4, 5, 6];
-  if (instruction.accountIndices.length !== expectedIndices.length || instruction.accountIndices.some((index, position) => index !== expectedIndices[position])) {
-    return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', 'Settlement instruction account indices do not match the immutable paymaster account order.');
+  // accountIndices address the transaction-wide account-key list (index 0 is the fee
+  // payer in a real compiled message), so bind by resolving the seven referenced metas
+  // in their required instruction-local order rather than demanding absolute indices.
+  if (instruction.accountIndices.length !== 7 || instruction.accountIndices.some((accountIndex) => !Number.isInteger(accountIndex) || accountIndex < 0)) {
+    return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', 'Settlement instruction must reference exactly the seven immutable paymaster accounts.');
   }
 
   const destination = transaction.role === 'distribute_profit'
@@ -155,8 +157,8 @@ function validateFixedSettlementInstruction(
     { pubkey: policy.tokenProgramId, signer: false, writable: false },
   ];
 
-  for (const [index, binding] of expected.entries()) {
-    const actual = transaction.accountMetas[index];
+  for (const [position, binding] of expected.entries()) {
+    const actual = transaction.accountMetas[instruction.accountIndices[position]!];
     if (
       !actual
       || actual.pubkey !== binding.pubkey
@@ -164,7 +166,7 @@ function validateFixedSettlementInstruction(
       || actual.isWritable !== binding.writable
       || (binding.ownerProgram !== undefined && actual.ownerProgram !== binding.ownerProgram)
     ) {
-      return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', `Settlement account ${index} differs from the source-locked binding.`);
+      return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', `Settlement account at instruction position ${position} differs from the source-locked binding.`);
     }
   }
   return undefined;

@@ -74,11 +74,14 @@ function transaction(
     requiredSigners: signerGraph(),
     instructions,
     accountMetas: role === 'distribute_profit'
-      ? settlementAccountMetas(PAYMASTER_DESTINATION)
+      ? [
+        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        ...settlementAccountMetas(PAYMASTER_DESTINATION),
+      ]
       : role === 'treasury_settle_and_tip'
         ? [
-          ...settlementAccountMetas(TREASURY_DESTINATION),
           { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+          ...settlementAccountMetas(TREASURY_DESTINATION),
           { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
         ]
         : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
@@ -155,10 +158,10 @@ function manifest(): TransactionManifest {
     instruction(5, 'flash_repay', FLASH_PROGRAM),
     instruction(6, 'paymaster_finalize', PAYMASTER_PROGRAM),
   ]);
-  const tx1 = transaction(1, 'distribute_profit', [instruction(0, 'distribute', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6])]);
+  const tx1 = transaction(1, 'distribute_profit', [instruction(0, 'distribute', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7])]);
   const tx2 = transaction(2, 'treasury_settle_and_tip', [
-    instruction(0, 'treasury_settle', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6]),
-    instruction(1, 'jito_tip', SYSTEM_PROGRAM, [7, 8], systemTransferDataBase64(500n)),
+    instruction(0, 'treasury_settle', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7]),
+    instruction(1, 'jito_tip', SYSTEM_PROGRAM, [0, 8], systemTransferDataBase64(500n)),
   ]);
   return {
     schemaVersion: '1.1',
@@ -319,9 +322,27 @@ describe('protected-bundle isolation', () => {
 
   it('rejects a decoded paymaster distribution with a substituted fixed destination', () => {
     const candidate = manifest();
-    const destination = candidate.transactions[1].accountMetas[5];
+    const destination = candidate.transactions[1].accountMetas[6];
     if (!destination) throw new Error('fixture is missing paymaster destination');
     destination.pubkey = 'Attacker1111111111111111111111111111111111';
+
+    expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
+  });
+
+  it('rejects a settlement instruction that points a position at the wrong transaction account', () => {
+    const candidate = manifest();
+    const distribute = candidate.transactions[1].instructions[0];
+    if (!distribute) throw new Error('fixture is missing distribution instruction');
+    distribute.accountIndices = [1, 2, 3, 4, 5, 0, 7];
+
+    expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
+  });
+
+  it('rejects a settlement instruction with an out-of-range account index', () => {
+    const candidate = manifest();
+    const distribute = candidate.transactions[1].instructions[0];
+    if (!distribute) throw new Error('fixture is missing distribution instruction');
+    distribute.accountIndices = [1, 2, 3, 4, 5, 6, 42];
 
     expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
   });
@@ -330,7 +351,7 @@ describe('protected-bundle isolation', () => {
     const candidate = manifest();
     const treasuryInstruction = candidate.transactions[2].instructions[0];
     if (!treasuryInstruction) throw new Error('fixture is missing treasury settlement');
-    treasuryInstruction.accountIndices = [0, 1, 2, 3, 5, 4, 6];
+    treasuryInstruction.accountIndices = [1, 2, 3, 4, 6, 5, 7];
 
     expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
   });
