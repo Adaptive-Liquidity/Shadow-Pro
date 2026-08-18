@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
@@ -126,11 +128,13 @@ pub mod shadow_paymaster {
         );
 
         transfer_from_vault(
-            &ctx.accounts.token_program,
-            &ctx.accounts.profit_vault,
-            &ctx.accounts.profit_mint,
-            &ctx.accounts.paymaster_destination,
-            &ctx.accounts.vault_authority,
+            VaultTransferAccounts {
+                token_program: &ctx.accounts.token_program,
+                profit_vault: &ctx.accounts.profit_vault,
+                profit_mint: &ctx.accounts.profit_mint,
+                destination: &ctx.accounts.paymaster_destination,
+                vault_authority: &ctx.accounts.vault_authority,
+            },
             ctx.accounts.config.key(),
             ctx.accounts.config.vault_authority_bump,
             settlement.paymaster_share,
@@ -155,11 +159,13 @@ pub mod shadow_paymaster {
         );
 
         transfer_from_vault(
-            &ctx.accounts.token_program,
-            &ctx.accounts.profit_vault,
-            &ctx.accounts.profit_mint,
-            &ctx.accounts.treasury_destination,
-            &ctx.accounts.vault_authority,
+            VaultTransferAccounts {
+                token_program: &ctx.accounts.token_program,
+                profit_vault: &ctx.accounts.profit_vault,
+                profit_mint: &ctx.accounts.profit_mint,
+                destination: &ctx.accounts.treasury_destination,
+                vault_authority: &ctx.accounts.vault_authority,
+            },
             ctx.accounts.config.key(),
             ctx.accounts.config.vault_authority_bump,
             settlement.treasury_share,
@@ -246,12 +252,16 @@ fn calculate_profit_split(
     Ok((eligible_profit, paymaster_share, treasury_share))
 }
 
+struct VaultTransferAccounts<'a, 'info> {
+    token_program: &'a Program<'info, Token>,
+    profit_vault: &'a Account<'info, TokenAccount>,
+    profit_mint: &'a Account<'info, Mint>,
+    destination: &'a Account<'info, TokenAccount>,
+    vault_authority: &'a UncheckedAccount<'info>,
+}
+
 fn transfer_from_vault<'info>(
-    token_program: &Program<'info, Token>,
-    profit_vault: &Account<'info, TokenAccount>,
-    profit_mint: &Account<'info, Mint>,
-    destination: &Account<'info, TokenAccount>,
-    vault_authority: &UncheckedAccount<'info>,
+    accounts: VaultTransferAccounts<'_, 'info>,
     config_key: Pubkey,
     vault_authority_bump: u8,
     amount: u64,
@@ -260,15 +270,19 @@ fn transfer_from_vault<'info>(
     let signer_seeds: &[&[u8]] = &[b"vault_authority", config_key.as_ref(), &bump];
     let signer = &[signer_seeds];
     let cpi_accounts = TransferChecked {
-        from: profit_vault.to_account_info(),
-        mint: profit_mint.to_account_info(),
-        to: destination.to_account_info(),
-        authority: vault_authority.to_account_info(),
+        from: accounts.profit_vault.to_account_info(),
+        mint: accounts.profit_mint.to_account_info(),
+        to: accounts.destination.to_account_info(),
+        authority: accounts.vault_authority.to_account_info(),
     };
     token::transfer_checked(
-        CpiContext::new_with_signer(token_program.to_account_info(), cpi_accounts, signer),
+        CpiContext::new_with_signer(
+            accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer,
+        ),
         amount,
-        profit_mint.decimals,
+        accounts.profit_mint.decimals,
     )
 }
 
