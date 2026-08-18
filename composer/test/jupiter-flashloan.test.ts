@@ -132,12 +132,30 @@ describe('Flashloan borrow/payback pair gate', () => {
   function payback(amount = 42n) {
     return decodeJupiterFlashloanInstruction(flashInstruction('flashloan_payback', amount));
   }
+  function paybackWithSubstitutedAccount(index: number) {
+    const compiled = flashInstruction('flashloan_payback');
+    compiled.accounts = compiled.accounts.map((account, currentIndex) => (
+      currentIndex === index
+        ? { ...account, pubkey: `Substitute${index}111111111111111111111111111111` }
+        : account
+    ));
+    return decodeJupiterFlashloanInstruction(compiled);
+  }
 
   it('accepts exactly one ordered same-amount borrow/payback pair', () => {
     expect(() => validateFlashloanBorrowPaybackPair([
       { ordinal: 3, decoded: borrow(42n) },
       { ordinal: 5, decoded: payback(42n) },
     ])).not.toThrow();
+  });
+
+  it('rejects a borrow/payback pair with substituted decoded account bindings', () => {
+    for (const index of [0, 2, 3, 4, 7]) {
+      expectCode(() => validateFlashloanBorrowPaybackPair([
+        { ordinal: 3, decoded: borrow() },
+        { ordinal: 5, decoded: paybackWithSubstitutedAccount(index) },
+      ]), 'FLASH_PAIR_ACCOUNT_MISMATCH');
+    }
   });
 
   it('rejects missing, duplicated, reordered, and altered-amount payback paths', () => {

@@ -24,6 +24,7 @@ export interface DecodedFlashloanInstruction {
   kind: FlashloanInstructionKind;
   amount: bigint;
   accountNames: readonly string[];
+  accountPubkeys: readonly string[];
   accountCount: 14;
 }
 
@@ -136,6 +137,7 @@ export function decodeJupiterFlashloanInstruction(
     kind,
     amount,
     accountNames: ACCOUNT_RULES.map((rule) => rule.name),
+    accountPubkeys: instruction.accounts.map((account) => account.pubkey),
     accountCount: 14,
   };
 }
@@ -160,5 +162,11 @@ export function validateFlashloanBorrowPaybackPair(
   }
   if (borrow.decoded.amount !== payback.decoded.amount) {
     throw new FlashloanDecodeError('FLASH_AMOUNT_MISMATCH', 'Flashloan payback amount must exactly equal the decoded borrow amount.');
+  }
+  if (
+    borrow.decoded.accountPubkeys.length !== payback.decoded.accountPubkeys.length
+    || borrow.decoded.accountPubkeys.some((pubkey, index) => pubkey !== payback.decoded.accountPubkeys[index])
+  ) {
+    throw new FlashloanDecodeError('FLASH_PAIR_ACCOUNT_MISMATCH', 'Flashloan borrow and payback must bind every decoded account to the same public key.');
   }
 }
