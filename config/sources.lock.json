@@ -5,10 +5,10 @@
     {
       "name": "shadow-paymaster-program",
       "kind": "anchor-program",
-      "program_id": "ShdwPymstr111111111111111111111111111111111",
+      "program_id": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
       "idl_sha256": null,
       "status": "local-only",
-      "implementation_gate": "A generated IDL hash and independently reviewed program ID are required before deployment."
+      "implementation_gate": "A generated IDL hash and owner-approved test-only program-ID lifecycle are required before deployment."
     },
     {
       "name": "jupiter-flashloan",

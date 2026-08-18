@@ -3,7 +3,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-shadow_paymaster = "ShdwPymstr111111111111111111111111111111111"
+shadow_paymaster = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 
 [provider]
 cluster = "Localnet"
