@@ -16,6 +16,11 @@ const PAYMASTER_DESTINATION = 'PayDest111111111111111111111111111111111';
 const TREASURY_DESTINATION = 'Treasury111111111111111111111111111111111';
 const TIP_ACCOUNT = 'TipAcct1111111111111111111111111111111111';
 const ALT = 'Lookup1111111111111111111111111111111111111';
+const CONFIG = 'Config111111111111111111111111111111111111';
+const VAULT_AUTHORITY = 'VaultAuth111111111111111111111111111111111';
+const PROFIT_VAULT = 'ProfitVault11111111111111111111111111111111';
+const SETTLEMENT = 'Settlement111111111111111111111111111111111';
+const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
 function systemTransferDataBase64(lamports: bigint): string {
   const data = Buffer.alloc(12);
@@ -32,6 +37,18 @@ function instruction(
   dataBase64?: string,
 ) {
   return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices, ...(dataBase64 ? { dataBase64 } : {}) };
+}
+
+function settlementAccountMetas(destination: string) {
+  return [
+    { pubkey: CONFIG, isSigner: false, isWritable: false, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: VAULT_AUTHORITY, isSigner: false, isWritable: false, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: SETTLEMENT, isSigner: false, isWritable: true, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: PROFIT_MINT, isSigner: false, isWritable: false, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: PROFIT_VAULT, isSigner: false, isWritable: true, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: destination, isSigner: false, isWritable: true, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false, ownerProgram: SYSTEM_PROGRAM },
+  ];
 }
 
 function signerGraph() {
@@ -56,12 +73,15 @@ function transaction(
     feePayer: PAYMASTER,
     requiredSigners: signerGraph(),
     instructions,
-    accountMetas: role === 'treasury_settle_and_tip'
-      ? [
-        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
-        { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
-      ]
-      : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
+    accountMetas: role === 'distribute_profit'
+      ? settlementAccountMetas(PAYMASTER_DESTINATION)
+      : role === 'treasury_settle_and_tip'
+        ? [
+          ...settlementAccountMetas(TREASURY_DESTINATION),
+          { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+          { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        ]
+        : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
     addressLookupTables: [ALT],
     computeUnitLimit: 200_000n,
     computeUnitPriceMicroLamports: 100n,
@@ -105,7 +125,12 @@ function policy(): GatePolicy {
     policyHash: 'p'.repeat(64),
     agentPubkey: AGENT,
     paymasterFeePayer: PAYMASTER,
-    allowedProgramIds: new Set([PAYMASTER_PROGRAM, FLASH_PROGRAM, SYSTEM_PROGRAM, COMPUTE_PROGRAM, DONTFRONT_PROGRAM]),
+    paymasterProgramId: PAYMASTER_PROGRAM,
+    configPubkey: CONFIG,
+    vaultAuthorityPubkey: VAULT_AUTHORITY,
+    profitVault: PROFIT_VAULT,
+    tokenProgramId: TOKEN_PROGRAM,
+    allowedProgramIds: new Set([PAYMASTER_PROGRAM, FLASH_PROGRAM, SYSTEM_PROGRAM, COMPUTE_PROGRAM, DONTFRONT_PROGRAM, TOKEN_PROGRAM]),
     allowedAddressLookupTables: new Set([ALT]),
     currentJitoTipAccounts: new Set([TIP_ACCOUNT]),
     allowedProfitMint: PROFIT_MINT,
@@ -130,10 +155,10 @@ function manifest(): TransactionManifest {
     instruction(5, 'flash_repay', FLASH_PROGRAM),
     instruction(6, 'paymaster_finalize', PAYMASTER_PROGRAM),
   ]);
-  const tx1 = transaction(1, 'distribute_profit', [instruction(0, 'distribute', PAYMASTER_PROGRAM)]);
+  const tx1 = transaction(1, 'distribute_profit', [instruction(0, 'distribute', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6])]);
   const tx2 = transaction(2, 'treasury_settle_and_tip', [
-    instruction(0, 'treasury_settle', PAYMASTER_PROGRAM),
-    instruction(1, 'jito_tip', SYSTEM_PROGRAM, [0, 1], systemTransferDataBase64(500n)),
+    instruction(0, 'treasury_settle', PAYMASTER_PROGRAM, [0, 1, 2, 3, 4, 5, 6]),
+    instruction(1, 'jito_tip', SYSTEM_PROGRAM, [7, 8], systemTransferDataBase64(500n)),
   ]);
   return {
     schemaVersion: '1.1',
@@ -163,7 +188,7 @@ function manifest(): TransactionManifest {
     },
     transactions: [tx0, tx1, tx2],
     settlement: {
-      settlementPda: 'Settlement111111111111111111111111111111111',
+      settlementPda: SETTLEMENT,
       profitMint: PROFIT_MINT,
       paymasterBps: 1500,
       treasuryBps: 8500,
@@ -292,6 +317,24 @@ describe('protected-bundle isolation', () => {
     expect(validateManifest(candidate, policy()).code).toBe('INSTRUCTION_TOPOLOGY_INVALID');
   });
 
+  it('rejects a decoded paymaster distribution with a substituted fixed destination', () => {
+    const candidate = manifest();
+    const destination = candidate.transactions[1].accountMetas[5];
+    if (!destination) throw new Error('fixture is missing paymaster destination');
+    destination.pubkey = 'Attacker1111111111111111111111111111111111';
+
+    expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
+  });
+
+  it('rejects a decoded treasury settlement with reordered fixed account indices', () => {
+    const candidate = manifest();
+    const treasuryInstruction = candidate.transactions[2].instructions[0];
+    if (!treasuryInstruction) throw new Error('fixture is missing treasury settlement');
+    treasuryInstruction.accountIndices = [0, 1, 2, 3, 5, 4, 6];
+
+    expect(validateManifest(candidate, policy()).code).toBe('SETTLEMENT_ACCOUNT_BINDING_INVALID');
+  });
+
   it('rejects a decoded Jito tip that exceeds the manifest cap', () => {
     const candidate = manifest();
     const tip = candidate.transactions[2].instructions[1];
@@ -303,7 +346,7 @@ describe('protected-bundle isolation', () => {
 
   it('rejects a decoded Jito tip bound to an unexpected recipient account', () => {
     const candidate = manifest();
-    const recipient = candidate.transactions[2].accountMetas[1];
+    const recipient = candidate.transactions[2].accountMetas[8];
     if (!recipient) throw new Error('fixture is missing Jito tip recipient');
     recipient.pubkey = 'Attacker1111111111111111111111111111111111';
 
