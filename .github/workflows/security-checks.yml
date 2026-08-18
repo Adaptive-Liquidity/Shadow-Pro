@@ -1,0 +1,169 @@
+name: Governance and Security Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    name: Governance and security checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate source lock integrity
+        run: |
+          node scripts/check_source_lock.mjs
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("config/sources.lock.json")
+          raw = path.read_text(encoding="utf-8")
+          normalized = json.dumps(json.loads(raw), indent=2) + "\n"
+          if raw != normalized:
+              raise SystemExit("config/sources.lock.json must remain canonical pretty-printed JSON.")
+          print("config/sources.lock.json is canonical JSON.")
+          PY
+
+      - name: Verify .manus remains credential-free
+        run: |
+          matches="$(grep -RInE \
+            --exclude='*.lock' \
+            --exclude='*.jsonl' \
+            '(-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}|PRIVATE_KEY[[:space:]]*=[^[:space:]]+|SECRET(_KEY)?[[:space:]]*=[^[:space:]]+)' \
+            .manus || true)"
+          if [[ -n "$matches" ]]; then
+            echo "Potential credential material detected in .manus:" >&2
+            echo "$matches" >&2
+            exit 1
+          fi
+          if find .manus \( -name '*.pem' -o -name '*.key' -o -name '*.keypair.json' \) -print | grep -q .; then
+            echo "Private-key-like file detected in .manus." >&2
+            exit 1
+          fi
+          echo ".manus is free of configured credential patterns."
+
+      - name: Check audit package metadata completeness
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path("audit/README.md")
+          if not readme.exists():
+              raise SystemExit("audit/README.md is missing.")
+
+          text = readme.read_text(encoding="utf-8")
+          required_snippets = [
+              "# Shadow Account Protocol External Audit Package",
+              "| Artifact | Repository location | Current state |",
+              "## Auditor questions",
+              "## Evidence admission rule",
+              "docs/THREAT_MODEL.md",
+              "docs/BUILD_STATUS.md",
+              "config/sources.lock.json",
+              "evidence/jupiter-flashloan/",
+              "evidence/jito/",
+              "docs/REMOTE_SIGNER_QUALIFICATION.md",
+              "programs/shadow_paymaster/",
+              "composer/src/",
+              ".github/",
+              "docs/GITHUB_GOVERNANCE.md",
+          ]
+          missing = [snippet for snippet in required_snippets if snippet not in text]
+          if missing:
+              raise SystemExit(
+                  "audit/README.md is missing required audit metadata references:\n- "
+                  + "\n- ".join(missing)
+              )
+
+          required_paths = [
+              "docs/THREAT_MODEL.md",
+              "docs/BUILD_STATUS.md",
+              "config/sources.lock.json",
+              "evidence/jupiter-flashloan",
+              "evidence/jito",
+              "docs/REMOTE_SIGNER_QUALIFICATION.md",
+              "programs/shadow_paymaster",
+              "composer/src",
+              ".github",
+              "docs/GITHUB_GOVERNANCE.md",
+          ]
+          missing_paths = [path for path in required_paths if not Path(path).exists()]
+          if missing_paths:
+              raise SystemExit(
+                  "Referenced audit package paths are missing:\n- "
+                  + "\n- ".join(missing_paths)
+              )
+
+          print("Audit package metadata references are complete.")
+          PY
+
+      - name: Flag blocked source modifications
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "No comparison base available; skipping blocked-source diff check."
+            exit 0
+          fi
+
+          if git diff --quiet "${BASE_SHA}" "${HEAD_SHA}" -- config/sources.lock.json; then
+            echo "config/sources.lock.json is unchanged."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          base_sha = os.environ["BASE_SHA"]
+          head_sha = os.environ["HEAD_SHA"]
+
+          def load_lock(sha: str) -> dict:
+              raw = subprocess.check_output(
+                  ["git", "show", f"{sha}:config/sources.lock.json"],
+                  text=True,
+              )
+              return json.loads(raw)
+
+          base_lock = load_lock(base_sha)
+          head_lock = load_lock(head_sha)
+          base_blocked = {
+              entry["name"]: entry
+              for entry in base_lock.get("entries", [])
+              if entry.get("status") == "blocked"
+          }
+          head_entries = {
+              entry["name"]: entry for entry in head_lock.get("entries", [])
+          }
+          changed = [
+              name
+              for name, entry in base_blocked.items()
+              if head_entries.get(name) != entry
+          ]
+
+          if changed:
+              raise SystemExit(
+                  "Blocked source entries changed and require explicit governance review:\n- "
+                  + "\n- ".join(sorted(changed))
+              )
+
+          print("Blocked source entries are unchanged.")
+          PY

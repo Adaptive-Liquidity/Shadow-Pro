@@ -13,15 +13,44 @@ jobs:
   validate:
     name: Deterministic validation
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate tracked file sizes
+        run: |
+          limit_kib=1024
+          oversized="$(
+            find . \
+              -path './.git' -prune -o \
+              -path './target' -prune -o \
+              -path './composer/node_modules' -prune -o \
+              -type f -size +"${limit_kib}"k -print
+          )"
+          if [[ -n "$oversized" ]]; then
+            echo "Tracked files larger than ${limit_kib} KiB are not allowed:" >&2
+            echo "$oversized" >&2
+            exit 1
+          fi
+          echo "All tracked files are within the ${limit_kib} KiB limit."
+
+      - name: Lint Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: |
+            README.md
+            docs/**/*.md
+            audit/**/*.md
+            evidence/**/*.md
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -56,20 +85,30 @@ jobs:
       - name: Verify Rust formatting
         run: cargo fmt --check
 
+      - name: Lint Shadow Paymaster
+        run: cargo clippy -p shadow_paymaster --all-targets -- -D warnings
+
       - name: Test Shadow Paymaster
         run: cargo test -p shadow_paymaster
 
       - name: Check Shadow Paymaster
         run: cargo check -p shadow_paymaster
 
+      - name: Audit Rust dependencies
+        run: cargo audit
+
       - name: Install composer dependencies
         working-directory: composer
         run: pnpm install --frozen-lockfile
 
-      - name: Build and test composer
+      - name: Build composer
         working-directory: composer
-        run: pnpm build && pnpm test
+        run: pnpm build
 
-      - name: Dependency audit
+      - name: Test composer
         working-directory: composer
-        run: pnpm audit --prod --audit-level high
+        run: pnpm test
+
+      - name: Audit composer dependencies
+        working-directory: composer
+        run: pnpm audit --audit-level high
