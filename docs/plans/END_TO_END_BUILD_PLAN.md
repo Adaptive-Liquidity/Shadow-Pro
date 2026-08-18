@@ -2,7 +2,7 @@
 
 **Status:** Active evidence-led plan.
 **Repository:** [`Adaptive-Liquidity/Shadow-Pro`](https://github.com/Adaptive-Liquidity/Shadow-Pro).
-**Review path:** PR [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1), branch `manus/bootstrap-security-baseline-v2`.
+**Merged baseline:** PR [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1) merged at `d92f83b4d05fe1af484baf4f38718c39c2ef2ee2`; Gate C remediations merged through PR [#5](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/5) and PR [#6](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/6); Gate D CI/SBOM hardening merged through PR [#8](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/8) at `03bc0332efb573589eeae1a80d9fb002dfa7400a`.
 **Scope:** Build and verify the protocol before any mainnet decision. **No mock-program substitution is permitted.** Every public-environment claim must use real, source-locked dependencies or remain blocked.
 
 > **Execution boundary:** This plan does not authorize production deployment, funding, key creation, provider connection, signer activation, bundle submission, mainnet interaction, or capital movement. Read-only RPC and public documentation research are allowed. Any state-changing public-network action requires a separate explicit approval.
@@ -51,7 +51,7 @@ The shared evidence artifact is `evidence/jupiter-flashloan/flashloan_33a22cf7.j
 
 ### Gate 0 — Governance, reproducibility, and evidence
 
-Maintain protected `main`, required `Deterministic validation` CI, secret/push protection, dependency alerts, immutable commit evidence, and the durable verified-state ledger. Every change requires a PR, reproducible command output, a residual-risk statement, and human review before merge. Do not add CODEOWNERS until valid GitHub reviewer accounts are named.
+Maintain protected `main`, required `Deterministic validation` CI, secret/push protection, dependency alerts, immutable commit evidence, and the durable verified-state ledger. Every change requires a PR, reproducible command output, a residual-risk statement, and owner review before merge. `CODEOWNERS` is established under `@Adaptive-Liquidity`; the owner may use external models or platforms as advisory review inputs, but their output never replaces deterministic evidence or release authority.
 
 ### Gate 1 — Read-only real-network verification
 
