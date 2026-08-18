@@ -44,8 +44,8 @@
 
 | ID | Status | Finding | Evidence | Remaining condition |
 |---|---|---|---|---|
-| G-001 | `fixed-on-pr` | Code-owner coverage now includes `.manus/**`, `evidence/**`, `CODEOWNERS`, `Cargo.lock`, and `composer/pnpm-lock.yaml`. | Commit `fcea230`; CI run `32126138973` passed. | Requires independent review and merge to become active on `main`. |
-| G-002 | `verified-open` | PR #1 has no qualifying independent human approval. | GitHub PR review state: `REVIEW_REQUIRED`. | A qualified independent reviewer must review the current immutable candidate after unresolved findings are addressed. |
+| G-001 | `fixed-on-pr` | Code-owner coverage now includes `.manus/**`, `evidence/**`, `CODEOWNERS`, `Cargo.lock`, and `composer/pnpm-lock.yaml`. | Commit `fcea230`; CI run `32126138973` passed. | Requires `@Adaptive-Liquidity` owner external-review signoff and merge to become active on `main`. |
+| G-002 | `owner-signoff-required` | PR #1 has no attributable owner external-review signoff for the current immutable candidate. | GitHub PR review state: `REVIEW_REQUIRED`; owner policy is `docs/governance/OWNER_EXTERNAL_REVIEW_SIGNOFF.md`. | `@Adaptive-Liquidity` must record a SHA-bound owner signoff after unresolved findings are addressed. External model/platform reviews may be attached as supporting evidence. |
 | G-003 | `candidate-review` | 47 inline and 5 issue comments remain captured. Most are automated comments on historical or current files; each must be source-verified before closure. | Comment JSON inventory. | Triage comment IDs individually as verified/stale/rejected/fixed before merge. |
 
 ## Automated-feedback buckets requiring source verification
@@ -70,9 +70,9 @@ A bot suggestion to require the agent signer for every distribution/settlement a
 - [x] Formal source-audit findings entered.
 - [x] Current automated feedback captured and bucketed.
 - [ ] Every captured comment source-verified and triaged.
-- [ ] Independent human review plan recorded for the eventual frozen candidate.
-- [ ] Current candidate independently approved after Gates B–D changes are completed.
+- [x] Owner external-review policy recorded.
+- [ ] SHA-bound `@Adaptive-Liquidity` owner external-review signoff recorded after Gates B–D changes are completed.
 
 ## Current Gate A decision
 
-**Blocked:** Gate A cannot pass until outstanding automated feedback is fully triaged and a qualified independent-review path is available. The next permissible implementation scope is Gate B remediation of F-001 and its directly related on-chain account tests; no later gate may be represented as complete.
+**Blocked:** Gate A cannot pass until outstanding automated feedback is fully triaged and a SHA-bound `@Adaptive-Liquidity` owner external-review signoff is recorded for the candidate. The next permissible implementation scope is Gate B remediation of F-001 and its directly related on-chain account tests; no later gate may be represented as complete.
