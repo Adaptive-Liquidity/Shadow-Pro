@@ -1,10 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 pub const PAYMASTER_BPS: u64 = 1_500;
-pub const TREASURY_BPS: u64 = 8_500;
 pub const BPS_DENOMINATOR: u64 = 10_000;
 
 #[program]
@@ -13,11 +12,11 @@ pub mod shadow_paymaster {
 
     pub fn initialize_config(ctx: Context<InitializeConfig>, agent: Pubkey) -> Result<()> {
         require!(agent != Pubkey::default(), ShadowError::InvalidAgent);
-        require_keys_neq!(
+        validate_settlement_destinations(
+            ctx.accounts.profit_vault.key(),
             ctx.accounts.paymaster_destination.key(),
             ctx.accounts.treasury_destination.key(),
-            ShadowError::DuplicateDestinations
-        );
+        )?;
 
         let config = &mut ctx.accounts.config;
         config.governance = ctx.accounts.governance.key();
@@ -45,9 +44,8 @@ pub mod shadow_paymaster {
         ctx: Context<PrepareSettlement>,
         args: PrepareSettlementArgs,
     ) -> Result<()> {
-        let clock = Clock::get()?;
         require!(!ctx.accounts.config.paused, ShadowError::ProtocolPaused);
-        require!(clock.slot < args.expiry_slot, ShadowError::Expired);
+        require_settlement_liveness(args.expiry_slot)?;
         require!(
             args.minimum_net_profit > 0,
             ShadowError::InvalidMinimumProfit
@@ -84,14 +82,13 @@ pub mod shadow_paymaster {
     }
 
     pub fn finalize_settlement(ctx: Context<FinalizeSettlement>) -> Result<()> {
-        let clock = Clock::get()?;
+        require_settlement_liveness(ctx.accounts.settlement.expiry_slot)?;
         validate_configured_profit_vault(
             ctx.accounts.profit_vault.key(),
             ctx.accounts.config.profit_vault,
         )?;
         let settlement = &mut ctx.accounts.settlement;
         require!(!ctx.accounts.config.paused, ShadowError::ProtocolPaused);
-        require!(clock.slot < settlement.expiry_slot, ShadowError::Expired);
         require!(
             settlement.state == SettlementState::Prepared,
             ShadowError::InvalidStateTransition
@@ -122,6 +119,7 @@ pub mod shadow_paymaster {
     pub fn distribute_paymaster(ctx: Context<DistributePaymaster>) -> Result<()> {
         let settlement = &mut ctx.accounts.settlement;
         require!(!ctx.accounts.config.paused, ShadowError::ProtocolPaused);
+        require_settlement_liveness(settlement.expiry_slot)?;
         require!(
             settlement.state == SettlementState::Finalized,
             ShadowError::InvalidStateTransition
@@ -130,6 +128,7 @@ pub mod shadow_paymaster {
         transfer_from_vault(
             &ctx.accounts.token_program,
             &ctx.accounts.profit_vault,
+            &ctx.accounts.profit_mint,
             &ctx.accounts.paymaster_destination,
             &ctx.accounts.vault_authority,
             ctx.accounts.config.key(),
@@ -149,6 +148,7 @@ pub mod shadow_paymaster {
     pub fn settle_treasury(ctx: Context<SettleTreasury>) -> Result<()> {
         let settlement = &mut ctx.accounts.settlement;
         require!(!ctx.accounts.config.paused, ShadowError::ProtocolPaused);
+        require_settlement_liveness(settlement.expiry_slot)?;
         require!(
             settlement.state == SettlementState::Distributed,
             ShadowError::InvalidStateTransition
@@ -157,6 +157,7 @@ pub mod shadow_paymaster {
         transfer_from_vault(
             &ctx.accounts.token_program,
             &ctx.accounts.profit_vault,
+            &ctx.accounts.profit_mint,
             &ctx.accounts.treasury_destination,
             &ctx.accounts.vault_authority,
             ctx.accounts.config.key(),
@@ -179,6 +180,38 @@ fn validate_configured_profit_vault(actual_vault: Pubkey, configured_vault: Pubk
     Ok(())
 }
 
+fn validate_settlement_destinations(
+    profit_vault: Pubkey,
+    paymaster_destination: Pubkey,
+    treasury_destination: Pubkey,
+) -> Result<()> {
+    require_keys_neq!(
+        paymaster_destination,
+        treasury_destination,
+        ShadowError::DuplicateDestinations
+    );
+    require_keys_neq!(
+        profit_vault,
+        paymaster_destination,
+        ShadowError::VaultDestinationAlias
+    );
+    require_keys_neq!(
+        profit_vault,
+        treasury_destination,
+        ShadowError::VaultDestinationAlias
+    );
+    Ok(())
+}
+
+fn validate_settlement_expiry(current_slot: u64, expiry_slot: u64) -> Result<()> {
+    require!(current_slot < expiry_slot, ShadowError::Expired);
+    Ok(())
+}
+
+fn require_settlement_liveness(expiry_slot: u64) -> Result<()> {
+    validate_settlement_expiry(Clock::get()?.slot, expiry_slot)
+}
+
 fn calculate_profit_split(
     post_vault_balance: u64,
     pre_vault_balance: u64,
@@ -199,11 +232,14 @@ fn calculate_profit_split(
         eligible_profit > minimum_net_profit,
         ShadowError::NetProfitInsufficient
     );
-    let paymaster_share = eligible_profit
-        .checked_mul(PAYMASTER_BPS)
-        .ok_or(ShadowError::ArithmeticOverflow)?
-        .checked_div(BPS_DENOMINATOR)
-        .ok_or(ShadowError::ArithmeticUnderflow)?;
+    let paymaster_share = u64::try_from(
+        (eligible_profit as u128)
+            .checked_mul(PAYMASTER_BPS as u128)
+            .ok_or(ShadowError::ArithmeticOverflow)?
+            .checked_div(BPS_DENOMINATOR as u128)
+            .ok_or(ShadowError::ArithmeticUnderflow)?,
+    )
+    .map_err(|_| ShadowError::ArithmeticOverflow)?;
     let treasury_share = eligible_profit
         .checked_sub(paymaster_share)
         .ok_or(ShadowError::ArithmeticUnderflow)?;
@@ -213,6 +249,7 @@ fn calculate_profit_split(
 fn transfer_from_vault<'info>(
     token_program: &Program<'info, Token>,
     profit_vault: &Account<'info, TokenAccount>,
+    profit_mint: &Account<'info, Mint>,
     destination: &Account<'info, TokenAccount>,
     vault_authority: &UncheckedAccount<'info>,
     config_key: Pubkey,
@@ -222,14 +259,16 @@ fn transfer_from_vault<'info>(
     let bump = [vault_authority_bump];
     let signer_seeds: &[&[u8]] = &[b"vault_authority", config_key.as_ref(), &bump];
     let signer = &[signer_seeds];
-    let cpi_accounts = Transfer {
+    let cpi_accounts = TransferChecked {
         from: profit_vault.to_account_info(),
+        mint: profit_mint.to_account_info(),
         to: destination.to_account_info(),
         authority: vault_authority.to_account_info(),
     };
-    token::transfer(
+    token::transfer_checked(
         CpiContext::new_with_signer(token_program.to_account_info(), cpi_accounts, signer),
         amount,
+        profit_mint.decimals,
     )
 }
 
@@ -534,6 +573,48 @@ mod tests {
     }
 
     #[test]
+    fn initialization_rejects_vault_destination_alias() {
+        let vault = Pubkey::new_unique();
+        let treasury = Pubkey::new_unique();
+
+        let error = validate_settlement_destinations(vault, vault, treasury)
+            .expect_err("a destination may not alias the profit vault");
+
+        assert!(error
+            .to_string()
+            .contains("error_name: \"VaultDestinationAlias\""));
+    }
+
+    #[test]
+    fn initialization_rejects_duplicate_destinations() {
+        let vault = Pubkey::new_unique();
+        let destination = Pubkey::new_unique();
+
+        let error = validate_settlement_destinations(vault, destination, destination)
+            .expect_err("paymaster and treasury destinations must be distinct");
+
+        assert!(error
+            .to_string()
+            .contains("error_name: \"DuplicateDestinations\""));
+    }
+
+    #[test]
+    fn settlement_expiry_rejects_current_or_past_slot() {
+        let current_slot_error = validate_settlement_expiry(100, 100)
+            .expect_err("settlement must expire at its expiry slot");
+        let past_slot_error = validate_settlement_expiry(101, 100)
+            .expect_err("settlement must expire after its expiry slot");
+
+        assert!(current_slot_error
+            .to_string()
+            .contains("error_name: \"Expired\""));
+        assert!(past_slot_error
+            .to_string()
+            .contains("error_name: \"Expired\""));
+        assert!(validate_settlement_expiry(99, 100).is_ok());
+    }
+
+    #[test]
     fn profit_split_uses_exact_fifteen_eighty_five_remainder() {
         let result = calculate_profit_split(1_020_000, 1_000_000, 5_000, 10_000).unwrap();
         assert_eq!(result, (15_000, 2_250, 12_750));
@@ -549,6 +630,15 @@ mod tests {
     fn profit_split_requires_strict_minimum_profit() {
         let result = calculate_profit_split(1_015, 1_000, 5, 10);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn profit_split_handles_maximum_u64_eligible_profit() {
+        let (eligible, paymaster, treasury) =
+            calculate_profit_split(u64::MAX, 0, 0, 0).expect("u128 intermediate must be safe");
+
+        assert_eq!(eligible, u64::MAX);
+        assert_eq!(paymaster.checked_add(treasury), Some(eligible));
     }
 
     #[test]
@@ -590,6 +680,8 @@ pub enum ShadowError {
     UnexpectedVault,
     #[msg("Paymaster and treasury destinations must be distinct.")]
     DuplicateDestinations,
+    #[msg("A settlement destination may not alias the protocol profit vault.")]
+    VaultDestinationAlias,
     #[msg("The configured agent is invalid.")]
     InvalidAgent,
     #[msg("Minimum net profit must be strictly positive.")]
