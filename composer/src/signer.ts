@@ -8,6 +8,25 @@ ed25519.etc.sha512Async = async (...messages: Uint8Array[]): Promise<Uint8Array>
   return new Uint8Array(digest);
 };
 
+function decodeCanonicalBase64(value: string): Buffer {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new Error('INVALID_ED25519_RECEIPT_ENCODING');
+  }
+  const decoded = Buffer.from(value, 'base64');
+  if (decoded.toString('base64') !== value) {
+    throw new Error('INVALID_ED25519_RECEIPT_ENCODING');
+  }
+  return decoded;
+}
+
+function decodeEd25519PublicKey(value: string): Uint8Array {
+  try {
+    return bs58.decode(value);
+  } catch {
+    throw new Error('INVALID_ED25519_RECEIPT_ENCODING');
+  }
+}
+
 export interface SignReceipt {
   requestId: string;
   idempotencyKey: string;
@@ -25,17 +44,21 @@ export async function verifySignReceipt(receipt: SignReceipt, expectedSigner: st
   if (receipt.messageHash !== expectedMessageHash) {
     throw new Error('SIGN_RECEIPT_MESSAGE_HASH_MISMATCH');
   }
-  if (Date.parse(receipt.expiresAt) <= now.getTime()) {
+  const expiryMilliseconds = Date.parse(receipt.expiresAt);
+  if (!Number.isFinite(expiryMilliseconds)) {
+    throw new Error('SIGN_RECEIPT_EXPIRY_INVALID');
+  }
+  if (expiryMilliseconds <= now.getTime()) {
     throw new Error('SIGN_RECEIPT_EXPIRED');
   }
 
-  const message = Buffer.from(receipt.serializedMessageBase64, 'base64');
+  const message = decodeCanonicalBase64(receipt.serializedMessageBase64);
   if (message.length === 0 || sha256Hex(message) !== expectedMessageHash) {
     throw new Error('EXACT_MESSAGE_HASH_MISMATCH');
   }
 
-  const publicKey = bs58.decode(receipt.signerPubkey);
-  const signature = Buffer.from(receipt.signatureBase64, 'base64');
+  const publicKey = decodeEd25519PublicKey(receipt.signerPubkey);
+  const signature = decodeCanonicalBase64(receipt.signatureBase64);
   if (publicKey.length !== 32 || signature.length !== 64) {
     throw new Error('INVALID_ED25519_RECEIPT_ENCODING');
   }
