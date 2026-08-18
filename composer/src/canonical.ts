@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ProfitSplit } from './types.js';
 
 const HASH_HEX = /^[0-9a-f]{64}$/;
+const U64_MAX = 18_446_744_073_709_551_615n;
 
 export function assertHash(value: string, field: string): void {
   if (!HASH_HEX.test(value)) {
@@ -62,7 +63,11 @@ export function parseAtomicUnits(value: string, field: string): bigint {
   if (!/^(0|[1-9][0-9]{0,19})$/.test(value)) {
     throw new Error(`${field} must be an unsigned base-10 u64 integer string`);
   }
-  return BigInt(value);
+  const parsed = BigInt(value);
+  if (parsed > U64_MAX) {
+    throw new Error(`${field} exceeds the maximum u64 atomic-unit value`);
+  }
+  return parsed;
 }
 
 export function checkedProfitSplit(
