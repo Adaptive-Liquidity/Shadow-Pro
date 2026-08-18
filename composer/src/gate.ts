@@ -21,6 +21,9 @@ const REQUIRED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedI
   treasury_settle_and_tip: ['treasury_settle', 'jito_tip'],
 };
 
+const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
+const SYSTEM_TRANSFER_INSTRUCTION = 2;
+
 const ALLOWED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedInstruction['classifier'][]> = {
   execute_flash_route: [...REQUIRED_CLASSIFIERS.execute_flash_route, 'route'],
   distribute_profit: REQUIRED_CLASSIFIERS.distribute_profit,
@@ -37,23 +40,136 @@ function exactRoles(transactions: readonly DecodedTransaction[]): boolean {
   });
 }
 
-function hasExpectedSequence(instructions: readonly DecodedInstruction[]): boolean {
+function occursExactlyOnce(classes: readonly DecodedInstruction['classifier'][], classifier: DecodedInstruction['classifier']): boolean {
+  return classes.filter((value) => value === classifier).length === 1;
+}
+
+function hasCanonicalExecutionSequence(instructions: readonly DecodedInstruction[]): boolean {
   const classes = instructions.map((instruction) => instruction.classifier);
+  const requiredOnce: readonly DecodedInstruction['classifier'][] = [
+    'compute_budget',
+    'dontfront',
+    'paymaster_begin',
+    'flash_borrow',
+    'flash_repay',
+    'paymaster_finalize',
+  ];
+  if (!requiredOnce.every((classifier) => occursExactlyOnce(classes, classifier))) return false;
+  if (classes[0] !== 'compute_budget' || classes[1] !== 'dontfront') return false;
+
   const begin = classes.indexOf('paymaster_begin');
   const borrow = classes.indexOf('flash_borrow');
   const repay = classes.indexOf('flash_repay');
   const finalize = classes.indexOf('paymaster_finalize');
-  return begin >= 0 && borrow > begin && repay > borrow && finalize > repay;
+  const routeIndices = classes
+    .map((classifier, index) => (classifier === 'route' ? index : -1))
+    .filter((index) => index >= 0);
+
+  return begin === 2
+    && borrow === begin + 1
+    && routeIndices.length > 0
+    && routeIndices.every((index) => index > borrow && index < repay)
+    && repay > borrow
+    && finalize === repay + 1
+    && finalize === classes.length - 1;
 }
 
 function hasRequiredClassifiers(transaction: DecodedTransaction): boolean {
   const classes = transaction.instructions.map((instruction) => instruction.classifier);
-  const required = REQUIRED_CLASSIFIERS[transaction.role];
-  if (!required.every((classifier) => classes.includes(classifier))) return false;
   if (!classes.every((classifier) => ALLOWED_CLASSIFIERS[transaction.role].includes(classifier))) return false;
-  if (transaction.role === 'execute_flash_route') return hasExpectedSequence(transaction.instructions);
-  if (transaction.role === 'treasury_settle_and_tip') return classes.at(-1) === 'jito_tip';
-  return true;
+  if (transaction.role === 'execute_flash_route') return hasCanonicalExecutionSequence(transaction.instructions);
+  if (transaction.role === 'distribute_profit') return classes.length === 1 && classes[0] === 'distribute';
+  return classes.length === 2 && classes[0] === 'treasury_settle' && classes[1] === 'jito_tip';
+}
+
+function decodeBoundedJitoTip(
+  transaction: DecodedTransaction,
+  policy: GatePolicy,
+  manifest: TransactionManifest,
+): GateDecision | undefined {
+  const tipInstruction = transaction.instructions[1];
+  if (!tipInstruction || tipInstruction.classifier !== 'jito_tip') {
+    return reject('JITO_TIP_TOPOLOGY_INVALID', 'TX-3 must end with exactly one Jito tip instruction.');
+  }
+  if (tipInstruction.programId !== SYSTEM_PROGRAM_ID || tipInstruction.accountIndices.length !== 2 || !tipInstruction.dataBase64) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip must be a canonical two-account System Program transfer.');
+  }
+
+  let data: Buffer;
+  try {
+    data = Buffer.from(tipInstruction.dataBase64, 'base64');
+  } catch {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip transfer data is not decodable base64.');
+  }
+  if (data.toString('base64') !== tipInstruction.dataBase64 || data.length !== 12 || data.readUInt32LE(0) !== SYSTEM_TRANSFER_INSTRUCTION) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip must use the canonical System Program transfer encoding.');
+  }
+  const tipLamports = data.readBigUInt64LE(4);
+  if (tipLamports === 0n || tipLamports > manifest.risk.maxTipLamports) {
+    return reject('JITO_TIP_CAP_EXCEEDED', 'Decoded Jito tip amount is zero or exceeds the manifest cap.');
+  }
+
+  const payer = transaction.accountMetas[tipInstruction.accountIndices[0]!];
+  const recipient = transaction.accountMetas[tipInstruction.accountIndices[1]!];
+  if (
+    !payer
+    || !recipient
+    || payer.pubkey !== policy.paymasterFeePayer
+    || !payer.isSigner
+    || !payer.isWritable
+    || payer.ownerProgram !== SYSTEM_PROGRAM_ID
+    || recipient.pubkey !== manifest.settlement.tipAccount
+    || recipient.isSigner
+    || !recipient.isWritable
+    || recipient.ownerProgram !== SYSTEM_PROGRAM_ID
+  ) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip account metas do not bind the expected payer and verified recipient.');
+  }
+  return undefined;
+}
+
+function validateFixedSettlementInstruction(
+  transaction: DecodedTransaction,
+  policy: GatePolicy,
+  manifest: TransactionManifest,
+): GateDecision | undefined {
+  const instruction = transaction.instructions[0];
+  if (!instruction || instruction.programId !== policy.paymasterProgramId) {
+    return reject('SETTLEMENT_PROGRAM_BINDING_INVALID', 'Settlement instruction must invoke the source-locked paymaster program.');
+  }
+  // accountIndices address the transaction-wide account-key list (index 0 is the fee
+  // payer in a real compiled message), so bind by resolving the seven referenced metas
+  // in their required instruction-local order rather than demanding absolute indices.
+  if (instruction.accountIndices.length !== 7 || instruction.accountIndices.some((accountIndex) => !Number.isInteger(accountIndex) || accountIndex < 0)) {
+    return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', 'Settlement instruction must reference exactly the seven immutable paymaster accounts.');
+  }
+
+  const destination = transaction.role === 'distribute_profit'
+    ? policy.paymasterDestination
+    : policy.treasuryDestination;
+  const expected = [
+    { pubkey: policy.configPubkey, signer: false, writable: false, ownerProgram: policy.paymasterProgramId },
+    { pubkey: policy.vaultAuthorityPubkey, signer: false, writable: false },
+    { pubkey: manifest.settlement.settlementPda, signer: false, writable: true, ownerProgram: policy.paymasterProgramId },
+    { pubkey: policy.allowedProfitMint, signer: false, writable: false, ownerProgram: policy.tokenProgramId },
+    { pubkey: policy.profitVault, signer: false, writable: true, ownerProgram: policy.tokenProgramId },
+    { pubkey: destination, signer: false, writable: true, ownerProgram: policy.tokenProgramId },
+    { pubkey: policy.tokenProgramId, signer: false, writable: false },
+  ];
+
+  for (const [position, binding] of expected.entries()) {
+    const actual = transaction.accountMetas[instruction.accountIndices[position]!];
+    if (
+      !actual
+      || actual.pubkey !== binding.pubkey
+      || actual.isSigner !== binding.signer
+      || actual.isWritable !== binding.writable
+      || (binding.ownerProgram !== undefined && actual.ownerProgram !== binding.ownerProgram)
+    ) {
+      return reject('SETTLEMENT_ACCOUNT_BINDING_INVALID', `Settlement account at instruction position ${position} differs from the source-locked binding.`);
+    }
+  }
+  return undefined;
 }
 
 function transactionIsolationError(transaction: DecodedTransaction): GateDecision | undefined {
@@ -125,6 +241,14 @@ export function validateManifest(manifest: TransactionManifest, policy: GatePoli
     if (!hasOnlyAllowedAccounts(transaction, policy)) return reject('ACCOUNT_OR_ALT_DENIED', `Transaction ${transaction.index} contains an unapproved account owner or lookup table.`);
     const signerError = validateSignerGraph(transaction, policy);
     if (signerError) return signerError;
+    if (transaction.role === 'distribute_profit' || transaction.role === 'treasury_settle_and_tip') {
+      const settlementError = validateFixedSettlementInstruction(transaction, policy, manifest);
+      if (settlementError) return settlementError;
+    }
+    if (transaction.role === 'treasury_settle_and_tip') {
+      const tipError = decodeBoundedJitoTip(transaction, policy, manifest);
+      if (tipError) return tipError;
+    }
     totalPriorityFee += computePriorityFeeLamports(transaction);
   }
 

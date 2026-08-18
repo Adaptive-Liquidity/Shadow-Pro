@@ -15,9 +15,39 @@ const PAYMASTER_DESTINATION = 'PayDest111111111111111111111111111111111';
 const TREASURY_DESTINATION = 'Treasury111111111111111111111111111111111';
 const TIP_ACCOUNT = 'TipAcct1111111111111111111111111111111111';
 const ALT = 'Lookup1111111111111111111111111111111111111';
+const CONFIG = 'Config111111111111111111111111111111111111';
+const VAULT_AUTHORITY = 'VaultAuth111111111111111111111111111111111';
+const PROFIT_VAULT = 'ProfitVault11111111111111111111111111111111';
+const SETTLEMENT = 'Settlement111111111111111111111111111111111';
+const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
-function ix(ordinal: number, classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'], programId: string) {
-  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices: [] };
+function systemTransferDataBase64(lamports: bigint): string {
+  const data = Buffer.alloc(12);
+  data.writeUInt32LE(2, 0);
+  data.writeBigUInt64LE(lamports, 4);
+  return data.toString('base64');
+}
+
+function ix(
+  ordinal: number,
+  classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'],
+  programId: string,
+  accountIndices: number[] = [],
+  dataBase64?: string,
+) {
+  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices, ...(dataBase64 ? { dataBase64 } : {}) };
+}
+
+function settlementAccountMetas(destination: string) {
+  return [
+    { pubkey: CONFIG, isSigner: false, isWritable: false, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: VAULT_AUTHORITY, isSigner: false, isWritable: false, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: SETTLEMENT, isSigner: false, isWritable: true, ownerProgram: PAYMASTER_PROGRAM },
+    { pubkey: PROFIT_MINT, isSigner: false, isWritable: false, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: PROFIT_VAULT, isSigner: false, isWritable: true, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: destination, isSigner: false, isWritable: true, ownerProgram: TOKEN_PROGRAM },
+    { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false, ownerProgram: SYSTEM_PROGRAM },
+  ];
 }
 
 function makeManifest(): TransactionManifest {
@@ -31,7 +61,18 @@ function makeManifest(): TransactionManifest {
     feePayer: PAYMASTER,
     requiredSigners: [{ pubkey: AGENT, role: 'agent_intent' as const }, { pubkey: PAYMASTER, role: 'paymaster_fee_payer' as const }],
     instructions,
-    accountMetas: [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
+    accountMetas: role === 'distribute_profit'
+      ? [
+        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        ...settlementAccountMetas(PAYMASTER_DESTINATION),
+      ]
+      : role === 'treasury_settle_and_tip'
+        ? [
+          { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+          ...settlementAccountMetas(TREASURY_DESTINATION),
+          { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        ]
+        : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
     addressLookupTables: [ALT],
     computeUnitLimit: 200_000n,
     computeUnitPriceMicroLamports: 100n,
@@ -40,14 +81,17 @@ function makeManifest(): TransactionManifest {
     ix(0, 'compute_budget', COMPUTE_PROGRAM), ix(1, 'dontfront', DONTFRONT_PROGRAM), ix(2, 'paymaster_begin', PAYMASTER_PROGRAM),
     ix(3, 'flash_borrow', FLASH_PROGRAM), ix(4, 'route', FLASH_PROGRAM), ix(5, 'flash_repay', FLASH_PROGRAM), ix(6, 'paymaster_finalize', PAYMASTER_PROGRAM),
   ]);
-  const tx1 = tx(1, 'distribute_profit', [ix(0, 'distribute', PAYMASTER_PROGRAM)]);
-  const tx2 = tx(2, 'treasury_settle_and_tip', [ix(0, 'treasury_settle', PAYMASTER_PROGRAM), ix(1, 'jito_tip', SYSTEM_PROGRAM)]);
+  const tx1 = tx(1, 'distribute_profit', [ix(0, 'distribute', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7])]);
+  const tx2 = tx(2, 'treasury_settle_and_tip', [
+    ix(0, 'treasury_settle', PAYMASTER_PROGRAM, [1, 2, 3, 4, 5, 6, 7]),
+    ix(1, 'jito_tip', SYSTEM_PROGRAM, [0, 8], systemTransferDataBase64(500n)),
+  ]);
   return {
     schemaVersion: '1.1', manifestId: '00000000-0000-7000-8000-000000000002', approvalNonce: 'l'.repeat(64), policyHash: 'p'.repeat(64), createdAt: '2026-08-16T00:00:00.000Z',
     simulation: { endpointId: 'local-fixture', simulationSlot: 99n, completedAt: '2026-08-16T00:00:00.000Z', receiptHash: 'r'.repeat(64), messageHashes: [tx0.messageHash, tx1.messageHash, tx2.messageHash], preVaultBalance: 1_000_000n, postVaultBalance: 1_020_000n, repaymentObligations: 5_000n, unitsConsumed: [100_000n, 20_000n, 20_000n] },
     risk: { maxBaseFeeLamports: 20_000n, maxPriorityFeeLamports: 1_000n, maxTipLamports: 500n, maxTotalFeeExposureLamports: 21_500n, slippageBps: 50, minimumNetProfit: { mint: PROFIT_MINT, atomicUnits: 10_000n }, maxSlotDelta: 2n },
     transactions: [tx0, tx1, tx2],
-    settlement: { settlementPda: 'Settlement111111111111111111111111111111111', profitMint: PROFIT_MINT, paymasterBps: 1500, treasuryBps: 8500, paymasterDestination: PAYMASTER_DESTINATION, treasuryDestination: TREASURY_DESTINATION, tipAccount: TIP_ACCOUNT },
+    settlement: { settlementPda: SETTLEMENT, profitMint: PROFIT_MINT, paymasterBps: 1500, treasuryBps: 8500, paymasterDestination: PAYMASTER_DESTINATION, treasuryDestination: TREASURY_DESTINATION, tipAccount: TIP_ACCOUNT },
   };
 }
 
@@ -66,7 +110,9 @@ function makePinnedSourceLock(): SourceLock {
 function makePolicy(): GatePolicy {
   return {
     policyHash: 'p'.repeat(64), agentPubkey: AGENT, paymasterFeePayer: PAYMASTER,
-    allowedProgramIds: new Set([PAYMASTER_PROGRAM, FLASH_PROGRAM, SYSTEM_PROGRAM, COMPUTE_PROGRAM, DONTFRONT_PROGRAM]),
+    paymasterProgramId: PAYMASTER_PROGRAM, configPubkey: CONFIG, vaultAuthorityPubkey: VAULT_AUTHORITY,
+    profitVault: PROFIT_VAULT, tokenProgramId: TOKEN_PROGRAM,
+    allowedProgramIds: new Set([PAYMASTER_PROGRAM, FLASH_PROGRAM, SYSTEM_PROGRAM, COMPUTE_PROGRAM, DONTFRONT_PROGRAM, TOKEN_PROGRAM]),
     allowedAddressLookupTables: new Set([ALT]), currentJitoTipAccounts: new Set([TIP_ACCOUNT]), allowedProfitMint: PROFIT_MINT,
     paymasterDestination: PAYMASTER_DESTINATION, treasuryDestination: TREASURY_DESTINATION, maxComputeUnitLimit: 500_000n,
     currentSlot: 100n, activeNonceSet: new Set(), sourceLock: makePinnedSourceLock(),

@@ -34,6 +34,7 @@ export interface DecodedInstruction {
   ordinal: number;
   programId: string;
   dataHash: string;
+  dataBase64?: string;
   accountIndices: number[];
   classifier: InstructionClassifier;
 }
@@ -112,6 +113,11 @@ export interface GatePolicy {
   policyHash: string;
   agentPubkey: string;
   paymasterFeePayer: string;
+  paymasterProgramId: string;
+  configPubkey: string;
+  vaultAuthorityPubkey: string;
+  profitVault: string;
+  tokenProgramId: string;
   allowedProgramIds: ReadonlySet<string>;
   allowedAddressLookupTables: ReadonlySet<string>;
   currentJitoTipAccounts: ReadonlySet<string>;

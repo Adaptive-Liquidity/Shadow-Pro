@@ -4,6 +4,7 @@ import type { TransactionManifest } from './types.js';
 export type FakeRelayStatus = 'Pending' | 'Failed' | 'Landed' | 'Invalid' | 'Unknown';
 
 export interface FakeRelayReceipt {
+  approvalNonce: string;
   bundleId: string;
   status: FakeRelayStatus;
   expirySlot: bigint;
@@ -25,13 +26,20 @@ export class FakeRelay {
       throw new Error('Duplicate approval nonce cannot be resubmitted.');
     }
 
+    const firstTransaction = manifest.transactions[0];
+    if (!firstTransaction) throw new Error('Canonical bundle is missing TX-1.');
+    const expirySlot = manifest.transactions.reduce(
+      (earliest, transaction) => (transaction.expirySlot < earliest ? transaction.expirySlot : earliest),
+      firstTransaction.expirySlot,
+    );
     const bundleId = createHash('sha256')
-      .update(manifest.transactions.map((transaction) => transaction.messageHash).join(':'))
+      .update(`${manifest.approvalNonce}:${manifest.transactions.map((transaction) => transaction.messageHash).join(':')}`)
       .digest('hex');
     const receipt: FakeRelayReceipt = {
+      approvalNonce: manifest.approvalNonce,
       bundleId,
       status: 'Pending',
-      expirySlot: manifest.transactions[0].expirySlot,
+      expirySlot,
       messageHashes: [
         manifest.transactions[0].messageHash,
         manifest.transactions[1].messageHash,
@@ -43,7 +51,7 @@ export class FakeRelay {
     return receipt;
   }
 
-  setStatus(bundleId: string, status: Exclude<FakeRelayStatus, 'Unknown'>): FakeRelayReceipt {
+  setStatus(bundleId: string, status: Extract<FakeRelayStatus, 'Failed' | 'Landed' | 'Invalid'>): FakeRelayReceipt {
     const receipt = this.byBundleId.get(bundleId);
     if (!receipt) throw new Error('Unknown bundle ID.');
     if (receipt.status === 'Landed' || receipt.status === 'Failed' || receipt.status === 'Invalid') {
@@ -51,19 +59,20 @@ export class FakeRelay {
     }
     const updated = { ...receipt, status };
     this.byBundleId.set(bundleId, updated);
-    for (const [nonce, candidate] of this.byNonce.entries()) {
-      if (candidate.bundleId === bundleId) this.byNonce.set(nonce, updated);
-    }
+    this.byNonce.set(updated.approvalNonce, updated);
     return updated;
   }
 
   getStatus(bundleId: string, currentSlot: bigint): FakeRelayReceipt {
     const receipt = this.byBundleId.get(bundleId);
     if (!receipt) {
-      return { bundleId, status: 'Unknown', expirySlot: currentSlot, messageHashes: ['', '', ''] };
+      return { approvalNonce: '', bundleId, status: 'Unknown', expirySlot: currentSlot, messageHashes: ['', '', ''] };
     }
     if (receipt.status === 'Pending' && currentSlot >= receipt.expirySlot) {
-      return { ...receipt, status: 'Invalid' };
+      const invalidated = { ...receipt, status: 'Invalid' as const };
+      this.byBundleId.set(bundleId, invalidated);
+      this.byNonce.set(invalidated.approvalNonce, invalidated);
+      return invalidated;
     }
     return receipt;
   }
