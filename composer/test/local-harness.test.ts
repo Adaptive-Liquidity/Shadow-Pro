@@ -16,8 +16,21 @@ const TREASURY_DESTINATION = 'Treasury111111111111111111111111111111111';
 const TIP_ACCOUNT = 'TipAcct1111111111111111111111111111111111';
 const ALT = 'Lookup1111111111111111111111111111111111111';
 
-function ix(ordinal: number, classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'], programId: string) {
-  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices: [] };
+function systemTransferDataBase64(lamports: bigint): string {
+  const data = Buffer.alloc(12);
+  data.writeUInt32LE(2, 0);
+  data.writeBigUInt64LE(lamports, 4);
+  return data.toString('base64');
+}
+
+function ix(
+  ordinal: number,
+  classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'],
+  programId: string,
+  accountIndices: number[] = [],
+  dataBase64?: string,
+) {
+  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices, ...(dataBase64 ? { dataBase64 } : {}) };
 }
 
 function makeManifest(): TransactionManifest {
@@ -31,7 +44,12 @@ function makeManifest(): TransactionManifest {
     feePayer: PAYMASTER,
     requiredSigners: [{ pubkey: AGENT, role: 'agent_intent' as const }, { pubkey: PAYMASTER, role: 'paymaster_fee_payer' as const }],
     instructions,
-    accountMetas: [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
+    accountMetas: role === 'treasury_settle_and_tip'
+      ? [
+        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+      ]
+      : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
     addressLookupTables: [ALT],
     computeUnitLimit: 200_000n,
     computeUnitPriceMicroLamports: 100n,
@@ -41,7 +59,10 @@ function makeManifest(): TransactionManifest {
     ix(3, 'flash_borrow', FLASH_PROGRAM), ix(4, 'route', FLASH_PROGRAM), ix(5, 'flash_repay', FLASH_PROGRAM), ix(6, 'paymaster_finalize', PAYMASTER_PROGRAM),
   ]);
   const tx1 = tx(1, 'distribute_profit', [ix(0, 'distribute', PAYMASTER_PROGRAM)]);
-  const tx2 = tx(2, 'treasury_settle_and_tip', [ix(0, 'treasury_settle', PAYMASTER_PROGRAM), ix(1, 'jito_tip', SYSTEM_PROGRAM)]);
+  const tx2 = tx(2, 'treasury_settle_and_tip', [
+    ix(0, 'treasury_settle', PAYMASTER_PROGRAM),
+    ix(1, 'jito_tip', SYSTEM_PROGRAM, [0, 1], systemTransferDataBase64(500n)),
+  ]);
   return {
     schemaVersion: '1.1', manifestId: '00000000-0000-7000-8000-000000000002', approvalNonce: 'l'.repeat(64), policyHash: 'p'.repeat(64), createdAt: '2026-08-16T00:00:00.000Z',
     simulation: { endpointId: 'local-fixture', simulationSlot: 99n, completedAt: '2026-08-16T00:00:00.000Z', receiptHash: 'r'.repeat(64), messageHashes: [tx0.messageHash, tx1.messageHash, tx2.messageHash], preVaultBalance: 1_000_000n, postVaultBalance: 1_020_000n, repaymentObligations: 5_000n, unitsConsumed: [100_000n, 20_000n, 20_000n] },

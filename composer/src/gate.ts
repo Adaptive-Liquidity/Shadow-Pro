@@ -21,6 +21,9 @@ const REQUIRED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedI
   treasury_settle_and_tip: ['treasury_settle', 'jito_tip'],
 };
 
+const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
+const SYSTEM_TRANSFER_INSTRUCTION = 2;
+
 const ALLOWED_CLASSIFIERS: Record<DecodedTransaction['role'], readonly DecodedInstruction['classifier'][]> = {
   execute_flash_route: [...REQUIRED_CLASSIFIERS.execute_flash_route, 'route'],
   distribute_profit: REQUIRED_CLASSIFIERS.distribute_profit,
@@ -77,6 +80,52 @@ function hasRequiredClassifiers(transaction: DecodedTransaction): boolean {
   if (transaction.role === 'execute_flash_route') return hasCanonicalExecutionSequence(transaction.instructions);
   if (transaction.role === 'distribute_profit') return classes.length === 1 && classes[0] === 'distribute';
   return classes.length === 2 && classes[0] === 'treasury_settle' && classes[1] === 'jito_tip';
+}
+
+function decodeBoundedJitoTip(
+  transaction: DecodedTransaction,
+  policy: GatePolicy,
+  manifest: TransactionManifest,
+): GateDecision | undefined {
+  const tipInstruction = transaction.instructions[1];
+  if (!tipInstruction || tipInstruction.classifier !== 'jito_tip') {
+    return reject('JITO_TIP_TOPOLOGY_INVALID', 'TX-3 must end with exactly one Jito tip instruction.');
+  }
+  if (tipInstruction.programId !== SYSTEM_PROGRAM_ID || tipInstruction.accountIndices.length !== 2 || !tipInstruction.dataBase64) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip must be a canonical two-account System Program transfer.');
+  }
+
+  let data: Buffer;
+  try {
+    data = Buffer.from(tipInstruction.dataBase64, 'base64');
+  } catch {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip transfer data is not decodable base64.');
+  }
+  if (data.toString('base64') !== tipInstruction.dataBase64 || data.length !== 12 || data.readUInt32LE(0) !== SYSTEM_TRANSFER_INSTRUCTION) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip must use the canonical System Program transfer encoding.');
+  }
+  const tipLamports = data.readBigUInt64LE(4);
+  if (tipLamports === 0n || tipLamports > manifest.risk.maxTipLamports) {
+    return reject('JITO_TIP_CAP_EXCEEDED', 'Decoded Jito tip amount is zero or exceeds the manifest cap.');
+  }
+
+  const payer = transaction.accountMetas[tipInstruction.accountIndices[0]!];
+  const recipient = transaction.accountMetas[tipInstruction.accountIndices[1]!];
+  if (
+    !payer
+    || !recipient
+    || payer.pubkey !== policy.paymasterFeePayer
+    || !payer.isSigner
+    || !payer.isWritable
+    || payer.ownerProgram !== SYSTEM_PROGRAM_ID
+    || recipient.pubkey !== manifest.settlement.tipAccount
+    || recipient.isSigner
+    || !recipient.isWritable
+    || recipient.ownerProgram !== SYSTEM_PROGRAM_ID
+  ) {
+    return reject('JITO_TIP_BINDING_INVALID', 'Jito tip account metas do not bind the expected payer and verified recipient.');
+  }
+  return undefined;
 }
 
 function transactionIsolationError(transaction: DecodedTransaction): GateDecision | undefined {
@@ -148,6 +197,10 @@ export function validateManifest(manifest: TransactionManifest, policy: GatePoli
     if (!hasOnlyAllowedAccounts(transaction, policy)) return reject('ACCOUNT_OR_ALT_DENIED', `Transaction ${transaction.index} contains an unapproved account owner or lookup table.`);
     const signerError = validateSignerGraph(transaction, policy);
     if (signerError) return signerError;
+    if (transaction.role === 'treasury_settle_and_tip') {
+      const tipError = decodeBoundedJitoTip(transaction, policy, manifest);
+      if (tipError) return tipError;
+    }
     totalPriorityFee += computePriorityFeeLamports(transaction);
   }
 
