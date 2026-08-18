@@ -5,8 +5,7 @@ const BORROW_DISCRIMINATOR = Buffer.from([103, 19, 78, 24, 240, 9, 135, 63]);
 const PAYBACK_DISCRIMINATOR = Buffer.from([213, 47, 153, 137, 84, 243, 94, 232]);
 const ASSOCIATED_TOKEN_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const SYSTEM_PROGRAM = '11111111111111111111111111111111';
-const INSTRUCTION_SYSVAR = 'Sysvar1nstructions1111111111111';
-
+const INSTRUCTION_SYSVAR = 'Sysvar1nstructions1111111111111111111111111';
 export type FlashloanInstructionKind = 'flashloan_borrow' | 'flashloan_payback';
 
 export interface CompiledAccountMeta {
