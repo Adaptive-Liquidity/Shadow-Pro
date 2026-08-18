@@ -17,8 +17,21 @@ const TREASURY_DESTINATION = 'Treasury111111111111111111111111111111111';
 const TIP_ACCOUNT = 'TipAcct1111111111111111111111111111111111';
 const ALT = 'Lookup1111111111111111111111111111111111111';
 
-function instruction(ordinal: number, classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'], programId: string) {
-  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices: [] };
+function systemTransferDataBase64(lamports: bigint): string {
+  const data = Buffer.alloc(12);
+  data.writeUInt32LE(2, 0);
+  data.writeBigUInt64LE(lamports, 4);
+  return data.toString('base64');
+}
+
+function instruction(
+  ordinal: number,
+  classifier: TransactionManifest['transactions'][number]['instructions'][number]['classifier'],
+  programId: string,
+  accountIndices: number[] = [],
+  dataBase64?: string,
+) {
+  return { ordinal, classifier, programId, dataHash: 'a'.repeat(64), accountIndices, ...(dataBase64 ? { dataBase64 } : {}) };
 }
 
 function signerGraph() {
@@ -43,7 +56,12 @@ function transaction(
     feePayer: PAYMASTER,
     requiredSigners: signerGraph(),
     instructions,
-    accountMetas: [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
+    accountMetas: role === 'treasury_settle_and_tip'
+      ? [
+        { pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+        { pubkey: TIP_ACCOUNT, isSigner: false, isWritable: true, ownerProgram: SYSTEM_PROGRAM },
+      ]
+      : [{ pubkey: PAYMASTER, isSigner: true, isWritable: true, ownerProgram: SYSTEM_PROGRAM }],
     addressLookupTables: [ALT],
     computeUnitLimit: 200_000n,
     computeUnitPriceMicroLamports: 100n,
@@ -115,7 +133,7 @@ function manifest(): TransactionManifest {
   const tx1 = transaction(1, 'distribute_profit', [instruction(0, 'distribute', PAYMASTER_PROGRAM)]);
   const tx2 = transaction(2, 'treasury_settle_and_tip', [
     instruction(0, 'treasury_settle', PAYMASTER_PROGRAM),
-    instruction(1, 'jito_tip', SYSTEM_PROGRAM),
+    instruction(1, 'jito_tip', SYSTEM_PROGRAM, [0, 1], systemTransferDataBase64(500n)),
   ]);
   return {
     schemaVersion: '1.1',
@@ -267,6 +285,24 @@ describe('protected-bundle isolation', () => {
     candidate.transactions[0].instructions.push(instruction(7, 'route', FLASH_PROGRAM));
 
     expect(validateManifest(candidate, policy()).code).toBe('INSTRUCTION_TOPOLOGY_INVALID');
+  });
+
+  it('rejects a decoded Jito tip that exceeds the manifest cap', () => {
+    const candidate = manifest();
+    const tip = candidate.transactions[2].instructions[1];
+    if (!tip) throw new Error('fixture is missing Jito tip');
+    tip.dataBase64 = systemTransferDataBase64(501n);
+
+    expect(validateManifest(candidate, policy()).code).toBe('JITO_TIP_CAP_EXCEEDED');
+  });
+
+  it('rejects a decoded Jito tip bound to an unexpected recipient account', () => {
+    const candidate = manifest();
+    const recipient = candidate.transactions[2].accountMetas[1];
+    if (!recipient) throw new Error('fixture is missing Jito tip recipient');
+    recipient.pubkey = 'Attacker1111111111111111111111111111111111';
+
+    expect(validateManifest(candidate, policy()).code).toBe('JITO_TIP_BINDING_INVALID');
   });
 
   it('rejects a jito tip that is not the final instruction of TX-3', () => {

@@ -34,6 +34,7 @@ export interface DecodedInstruction {
   ordinal: number;
   programId: string;
   dataHash: string;
+  dataBase64?: string;
   accountIndices: number[];
   classifier: InstructionClassifier;
 }
