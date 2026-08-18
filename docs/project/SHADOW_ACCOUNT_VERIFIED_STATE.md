@@ -2,9 +2,9 @@
 
 **Purpose:** This is the durable cross-task memory for Project AGENT-SOL. It records only verified facts, explicit approvals, reproducible evidence, and hard blockers. It is not a source of authority for signing, funding, deployment, or transaction submission. Update it only after the referenced evidence is independently checked.
 
-**Last evidence update:** 2026-08-17.
+**Last evidence update:** 2026-08-18.
 **Canonical repository:** `https://github.com/Adaptive-Liquidity/Shadow-Pro`.
-**Active review path:** Pull request [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1), branch `manus/bootstrap-security-baseline-v2`, based on `main` history.
+**Current merged baseline:** PR [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1) merged at `d92f83b4d05fe1af484baf4f38718c39c2ef2ee2`; the Gate C admission remediations merged through PR [#5](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/5) at `6fa1dd93a0179cb43bea547f27fd360ce5c2320a` and PR [#6](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/6) at `7ed366454a1e87ad09d78ea50933992ee33b9257`; Gate D CI/SBOM hardening merged through PR [#8](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/8) at `03bc0332efb573589eeae1a80d9fb002dfa7400a`.
 **Do not merge:** the earlier `manus/bootstrap-security-baseline` branch has no common history with `main`; it exists only as a failed bootstrap attempt and must never be merged or force-pushed.
 
 ## Authority and evidence rules
@@ -36,14 +36,15 @@
 | Scope | Verified result | Evidence location |
 |---|---|---|
 | Rust formatting | Passed. | `cargo fmt --check` on PR branch. |
-| Anchor unit tests | 5 passed: program ID, exact 15/85 split, repayment shortfall, strict minimum, arithmetic overflow. | `cargo test -p shadow_paymaster`. |
+| Anchor unit tests | **11 passed**: program ID; configured/substitute vault checks; destination-alias checks; settlement-expiry enforcement; exact 15/85 split; strict minimum; repayment shortfall; and arithmetic boundaries. | `cargo test -p shadow_paymaster` on the PR #8 merged main baseline. |
 | Anchor compiler check | Passed with four known Anchor macro `unexpected_cfg` warnings; no Rust compile errors. | `cargo check -p shadow_paymaster`. |
 | Composer type check | Passed. | `pnpm build`. |
-| Composer adversarial suite | 32 passed across manifest, immutable Jupiter Flashloan decoder, source-lock, signer, local-harness, and fake-relay tests. The Jupiter suite accepts exact immutable borrow/payback bytes and rejects all signer/writable meta mutations, fixed-account substitutions, malformed payloads, unsupported discriminators, zero amount, missing/duplicated/reordered/altered payback. | `pnpm build && pnpm test` on commit `2aee6b8f4d216ecffd02dfd27da577ad5c61c7a3`; remote CI run `31987555281` passed. |
+| Composer adversarial suite | **52 passed** across source-lock evaluation, immutable Jupiter Flashloan decoding, local-harness zero-agent-capital/fee boundaries, manifest admission, exact-message signer receipts, and fake-relay nonce/expiry/status handling. The Jupiter suite rejects signer/writable-meta mutation, fixed-account substitution, malformed payloads, unsupported discriminators, zero amount, and missing/duplicated/reordered/altered payback. | `pnpm build && pnpm test` revalidated locally on merged main commit `03bc0332efb573589eeae1a80d9fb002dfa7400a`; Gate C CI had also passed before merge. |
 | Production dependency audit | Passed; no known vulnerabilities reported. | `pnpm audit --prod --audit-level high`. |
 | Secret-pattern check | Passed; no configured credential material or private-key-like file found. | `bash scripts/check_secrets.sh`. |
 | Source-lock check | Passed; Jupiter and Jito remain fail-closed. | `node scripts/check_source_lock.mjs`. |
 | Pull-request CI | The `Security Baseline CI` check passed after the pnpm setup-order correction, for immutable Jupiter evidence commit `d2bbd3ceb7597ff2b46817585faeade868af00c5` (run `31987192651`), and for devnet-readiness commit `09cb57f344226b8eb861112da55e020eeb2584c0` (run `31990649117`). | PR #1 workflow history. |
+| Gate D CI, auditable build, and SBOM | The owner-merged candidate `115474684c0dc5e241905c12d784ea5ab3a35ba5` passed `Security Baseline CI` run `32170459932`. The run validated the pinned Rust/Node toolchains, Rust formatting/lint/tests/check/audit, Composer build/tests/audit, `cargo-auditable 0.7.5` native build, CycloneDX SBOM generation, SHA-256 sums, and 30-day review-only SBOM artifact upload. The PR merged at `03bc0332efb573589eeae1a80d9fb002dfa7400a`. | PR [#8](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/8); run `32170459932`; `.manus/evidence/GATE_D_F008_CI_PINNING.md`; `.manus/evidence/GATE_D_F009_SBOM_ARTIFACTS.md`; `.manus/evidence/GATE_D_F012_DEVNET_GUARDS.md`. |
 
 ## Confirmed external-interface facts
 
@@ -76,7 +77,7 @@
 
 ## Governance and repository facts
 
-The canonical remote repository is public and its `main` branch initially contained one commit with one README. The complete baseline is in PR #1, never merged. On 2026-08-17, the active GitHub branch ruleset `Protect main branch` (ID `20923759`) was verified through the repository API: it targets the default branch and enforces deletion protection, force-push blocking, a pull request with one approval, stale-review dismissal, the current branch requirement, and the GitHub Actions `Deterministic validation` required check. GitHub private vulnerability reporting, dependency graph, Dependabot alerts, Dependabot security updates, Dependabot malware alerts, secret protection, and push protection are enabled. CodeQL has not been configured; enable it only through a reviewed workflow change. Code owners, named reviewer accounts, and a project board remain unconfigured. Do not merge PR #1 until a qualifying human review is recorded.
+The canonical remote repository is public. The security baseline was merged through PR [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1) on 2026-08-18, the two Gate C remediation PRs merged later that day, and Gate D CI/SBOM hardening merged through PR [#8](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/8) after its deterministic CI succeeded. The owner, `@Adaptive-Liquidity`, is the designated reviewer and may use external models or platforms to perform review; no separate independent reviewer is required by the project operating model. `CODEOWNERS` and the owner external-review signoff record are present in the repository. The legacy GitHub branch-protection endpoint is not authoritative for this repository because governance is managed through repository rulesets; continue to verify active merge requirements directly before relying on them. No production release authorization follows from any PR merge.
 
 ## Maintenance protocol
 

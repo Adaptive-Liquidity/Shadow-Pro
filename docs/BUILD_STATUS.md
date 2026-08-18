@@ -21,12 +21,12 @@
 | Repository secret-pattern check | Passed; no configured credential material or private-key-like file found. |
 | Source-lock check | Passed; external Jupiter and Jito dependencies remain fail-closed. |
 | Composer strict TypeScript build | Passed. |
-| Composer adversarial tests | **32 passed** across canonicalization, topology, destination, tip, freshness, profit, nonce replay, exact-message receipt verification, source lock, zero-agent-capital/fee coverage, route/flash isolation, fake-relay duplicate/expiry/status cases, and immutable Jupiter Flashloan instruction decoding. |
+| Composer adversarial tests | **52 passed** across source-lock evaluation, immutable Jupiter Flashloan decoding, local-harness zero-agent-capital/fee boundaries, manifest admission, exact-message signer receipts, and fake-relay nonce/expiry/status handling. |
 | Composer production dependency audit | Passed; no known vulnerabilities reported. |
 | Anchor program formatting | Passed. |
-| Anchor program unit tests | 5 passed: program ID, exact 15/85 split, repayment shortfall, strict minimum, arithmetic overflow. |
+| Anchor program unit tests | **11 passed**: program ID; configured/substitute vault checks; destination-alias checks; settlement-expiry enforcement; exact 15/85 split; strict minimum; repayment shortfall; and arithmetic boundaries. |
 | Anchor program compiler check | Passed with four known Anchor macro `unexpected_cfg` warnings under Rust 1.97 / Anchor 0.32.1; no Rust compile errors. |
-| Pull-request CI | Passed on PR #1 after correcting the pnpm setup order. |
+| Pull-request CI | Passed on merged PRs [#1](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/1), [#5](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/5), [#6](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/6), and [#8](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/8). The latest Gate D `Security Baseline CI` run `32170459932` passed, including the auditable native build and review-only SBOM artifact. |
 | Project skills validation | 3 of 3 valid. |
 
 ## Execution blockers
@@ -47,4 +47,4 @@ The available Hugging Face integration was inspected. It exposes Hub discovery, 
 
 ## Required next gate
 
-The immediate next approval-bound stage is a project-owned Shadow Paymaster devnet test. Before requesting it, the review branch must pass the new devnet readiness CI guard and the approval request must name the exact commit, program artifact hash, test-only public accounts, configuration hash, transaction/fee caps, stop conditions, and zero-agent-SOL verification method. Jupiter remains a hard non-mainnet block; Jito testnet may be observed read-only only. A human approval is required before deployment, test-payer funding, transaction submission, remote signer connection, relay activation, or bundle submission.
+The immediate engineering scope remains the unmerged Gate D hardening items: property/fuzz scaffolding, memory-tool provenance and correction hardening, repository-index provenance correction, documentation reconciliation, and relay-interface documentation. Gate E external-audit preparation follows only after Gate D is completed and owner-approved. A project-owned Shadow Paymaster devnet test remains a later, separately approved Gate F action. Jupiter remains a hard non-mainnet block; Jito testnet may be observed read-only only. A human approval is required before deployment, test-payer funding, transaction submission, remote signer connection, relay activation, or bundle submission.
