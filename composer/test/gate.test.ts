@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import fc from 'fast-check';
 import { canonicalJson, checkedProfitSplit, manifestHash, parseAtomicUnits } from '../src/canonical.js';
 import { validateManifest } from '../src/gate.js';
 import type { SourceLock } from '../src/source-lock.js';
@@ -21,6 +22,8 @@ const VAULT_AUTHORITY = 'VaultAuth111111111111111111111111111111111';
 const PROFIT_VAULT = 'ProfitVault11111111111111111111111111111111';
 const SETTLEMENT = 'Settlement111111111111111111111111111111111';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const U64_MAX = 18_446_744_073_709_551_615n;
+const PROPERTY_RUNS = { seed: 0x5a17_2026, numRuns: 512, endOnFailure: true } as const;
 
 function systemTransferDataBase64(lamports: bigint): string {
   const data = Buffer.alloc(12);
@@ -225,6 +228,92 @@ describe('canonical approval controls', () => {
   it('accepts the maximum u64 atomic amount and rejects the next integer', () => {
     expect(parseAtomicUnits('18446744073709551615', 'amount')).toBe(18_446_744_073_709_551_615n);
     expect(() => parseAtomicUnits('18446744073709551616', 'amount')).toThrow('exceeds the maximum u64');
+  });
+});
+
+describe('deterministic property and fuzz controls', () => {
+  it('canonicalizes generated manifest-like records independently of insertion order', () => {
+    const value = fc.oneof(
+      fc.string({ maxLength: 24 }),
+      fc.boolean(),
+      fc.bigInt({ min: 0n, max: U64_MAX }),
+    );
+    const record = fc.dictionary(fc.string({ minLength: 1, maxLength: 12 }), value, { maxKeys: 16 });
+
+    fc.assert(
+      fc.property(record, (candidate) => {
+        const reversed = Object.fromEntries(Object.entries(candidate).reverse());
+        expect(canonicalJson(candidate)).toBe(canonicalJson(reversed));
+        expect(manifestHash(candidate)).toBe(manifestHash(reversed));
+      }),
+      PROPERTY_RUNS,
+    );
+  });
+
+  it('accepts every generated u64 wire value exactly and rejects no in-range atomic unit', () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: U64_MAX }), (value) => {
+        expect(parseAtomicUnits(value.toString(10), 'amount')).toBe(value);
+      }),
+      PROPERTY_RUNS,
+    );
+  });
+
+  it('conserves generated eligible profit with the fixed 1500/8500 split', () => {
+    const profitInputs = fc.bigInt({ min: 1n, max: U64_MAX }).chain((eligibleProfit) =>
+      fc.bigInt({ min: 0n, max: U64_MAX - eligibleProfit }).chain((requiredPostRepayment) =>
+        fc.bigInt({ min: 0n, max: requiredPostRepayment }).chain((preVaultBalance) =>
+          fc.bigInt({ min: 0n, max: eligibleProfit - 1n }).map((minimumNetProfit) => ({
+            postVaultBalance: requiredPostRepayment + eligibleProfit,
+            preVaultBalance,
+            committedObligations: requiredPostRepayment - preVaultBalance,
+            minimumNetProfit,
+            eligibleProfit,
+          })),
+        ),
+      ),
+    );
+
+    fc.assert(
+      fc.property(profitInputs, (input) => {
+        const split = checkedProfitSplit(
+          input.postVaultBalance,
+          input.preVaultBalance,
+          input.committedObligations,
+          input.minimumNetProfit,
+        );
+        expect(split.eligibleProfit).toBe(input.eligibleProfit);
+        expect(split.paymasterShare).toBe((input.eligibleProfit * 1_500n) / 10_000n);
+        expect(split.treasuryShare).toBe(input.eligibleProfit - split.paymasterShare);
+        expect(split.paymasterShare + split.treasuryShare).toBe(input.eligibleProfit);
+      }),
+      PROPERTY_RUNS,
+    );
+  });
+
+  it('rejects every generated current-or-past transaction expiry before admission', () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: 100n }), (expirySlot) => {
+        const candidate = manifest();
+        candidate.transactions[0].expirySlot = expirySlot;
+        expect(validateManifest(candidate, policy()).code).toBe('EXPIRED');
+      }),
+      PROPERTY_RUNS,
+    );
+  });
+
+  it('rejects every generated non-policy treasury destination before instruction admission', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1, maxLength: 64 }).filter((destination) => destination !== TREASURY_DESTINATION),
+        (destination) => {
+          const candidate = manifest();
+          candidate.settlement.treasuryDestination = destination;
+          expect(validateManifest(candidate, policy()).code).toBe('DESTINATION_DENIED');
+        },
+      ),
+      PROPERTY_RUNS,
+    );
   });
 });
 

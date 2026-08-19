@@ -559,6 +559,32 @@ pub struct TreasurySettled {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::{prelude::*, test_runner::TestRunner};
+
+    fn valid_profit_inputs() -> impl Strategy<Value = (u64, u64, u64, u64)> {
+        (any::<u64>(), any::<u64>(), any::<u64>(), any::<u64>()).prop_filter_map(
+            "the generated balances must leave at least one atomic unit of eligible-profit capacity",
+            |(pre_vault_balance, obligations_seed, eligible_seed, minimum_seed)| {
+                let obligation_space = (u64::MAX - pre_vault_balance) as u128 + 1;
+                let committed_obligations = (obligations_seed as u128 % obligation_space) as u64;
+                let required_post_repayment = pre_vault_balance + committed_obligations;
+                let eligible_capacity = u64::MAX - required_post_repayment;
+                if eligible_capacity == 0 {
+                    return None;
+                }
+
+                let eligible_profit =
+                    ((eligible_seed as u128 % eligible_capacity as u128) + 1) as u64;
+                let minimum_net_profit = minimum_seed % eligible_profit;
+                Some((
+                    pre_vault_balance,
+                    committed_obligations,
+                    eligible_profit,
+                    minimum_net_profit,
+                ))
+            },
+        )
+    }
 
     #[test]
     fn finalize_rejects_substitute_vault() {
@@ -655,6 +681,81 @@ mod tests {
     fn profit_split_rejects_overflow() {
         let result = calculate_profit_split(u64::MAX, u64::MAX, 1, 1);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn property_profit_split_conserves_eligible_profit_and_fixed_bps() {
+        TestRunner::deterministic()
+            .run(
+                &valid_profit_inputs(),
+                |(
+                    pre_vault_balance,
+                    committed_obligations,
+                    eligible_profit,
+                    minimum_net_profit,
+                )| {
+                    let required_post_repayment = pre_vault_balance + committed_obligations;
+                    let post_vault_balance = required_post_repayment + eligible_profit;
+                    let (actual_eligible_profit, paymaster_share, treasury_share) =
+                        calculate_profit_split(
+                            post_vault_balance,
+                            pre_vault_balance,
+                            committed_obligations,
+                            minimum_net_profit,
+                        )?;
+
+                    prop_assert_eq!(actual_eligible_profit, eligible_profit);
+                    prop_assert_eq!(
+                        paymaster_share,
+                        ((eligible_profit as u128 * PAYMASTER_BPS as u128)
+                            / BPS_DENOMINATOR as u128) as u64
+                    );
+                    prop_assert_eq!(treasury_share, eligible_profit - paymaster_share);
+                    prop_assert_eq!(paymaster_share + treasury_share, eligible_profit);
+                    Ok(())
+                },
+            )
+            .expect("the fixed deterministic property corpus must preserve profit conservation");
+    }
+
+    #[test]
+    fn property_profit_split_rejects_profit_equal_to_minimum() {
+        TestRunner::deterministic()
+            .run(
+                &valid_profit_inputs(),
+                |(pre_vault_balance, committed_obligations, eligible_profit, _)| {
+                    let required_post_repayment = pre_vault_balance + committed_obligations;
+                    let post_vault_balance = required_post_repayment + eligible_profit;
+                    let result = calculate_profit_split(
+                        post_vault_balance,
+                        pre_vault_balance,
+                        committed_obligations,
+                        eligible_profit,
+                    );
+
+                    prop_assert!(result.is_err());
+                    Ok(())
+                },
+            )
+            .expect("the fixed deterministic property corpus must enforce a strict profit minimum");
+    }
+
+    #[test]
+    fn property_settlement_expiry_is_strictly_future_only() {
+        TestRunner::deterministic()
+            .run(
+                &(any::<u64>(), any::<u64>()),
+                |(current_slot, expiry_slot)| {
+                    prop_assert_eq!(
+                        validate_settlement_expiry(current_slot, expiry_slot).is_ok(),
+                        current_slot < expiry_slot,
+                    );
+                    Ok(())
+                },
+            )
+            .expect(
+                "the fixed deterministic property corpus must preserve strict expiry semantics",
+            );
     }
 }
 
