@@ -60,3 +60,9 @@ pnpm audit --prod --audit-level high
 | Local Node compatibility | Node `22.13.0` emitted the expected package-engine warning because CI is pinned to Node `24.19.0`; no test failed. |
 
 Remote CI remains the merge authority and must rerun against the signed candidate before any Gate D finding is treated as merged.
+
+## Remote CI
+
+The signed candidate `69ab3baf0e3d5bfa2d89b202832a17e88a787d64` passed GitHub `Security Baseline CI` run [`32201391947`](https://github.com/Adaptive-Liquidity/Shadow-Pro/actions/runs/32201391947). All 11 PR [#20](https://github.com/Adaptive-Liquidity/Shadow-Pro/pull/20) checks completed successfully, including deterministic validation, CodeQL analyses, governance/security checks, and configured review automation.
+
+The pull request is open and clean for the owner's review. This evidence does not authorize a merge, release, deployment, funding, source-lock change, signing-provider activation, Jupiter call, or Jito submission.
